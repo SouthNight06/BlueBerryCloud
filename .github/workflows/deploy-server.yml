@@ -55,6 +55,21 @@ jobs:
           fi
           echo "凭据齐备，目标用户 ${USER_NAME}"
 
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build web
+        env:
+          VITE_API_BASE: https://${{ inputs.domain || 'music.lichenlc.cn' }}
+        run: |
+          set -euo pipefail
+          cd web
+          npm ci --no-audit --no-fund
+          npm run build
+          test -f dist/index.html
+          du -sh dist
+          ls dist
+
       - name: Prepare ssh
         env:
           HOST: ${{ secrets.VPS_HOST || secrets.SERVER_HOST || secrets.SSH_HOST || secrets.DEPLOY_HOST }}
@@ -96,11 +111,11 @@ jobs:
           SUDO=""
           if [ "$(id -u)" != "0" ]; then SUDO="sudo -n"; fi
 
-          log "1/8 安装基础软件"
+          log "1/9 安装基础软件"
           $SUDO apt-get update -qq
           $SUDO apt-get install -y -qq git curl openssl ca-certificates
 
-          log "2/8 检查 Node 版本（需要 >= 22.5）"
+          log "2/9 检查 Node 版本（需要 >= 22.5）"
           NODE_OK=0
           if command -v node >/dev/null 2>&1; then
             if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=5)?0:1)'; then NODE_OK=1; fi
@@ -111,7 +126,7 @@ jobs:
           fi
           node -v
 
-          log "3/8 同步代码"
+          log "3/9 同步代码"
           sync_git() {
             if [ -d "$APPDIR/.git" ]; then
               $SUDO git -C "$APPDIR" remote set-url origin "$REPO" || return 1
@@ -153,11 +168,26 @@ jobs:
           fi
           echo "  代码版本：$SYNC_HEAD"
 
-          log "4/8 安装服务端依赖"
+          log "4/9 发布前端产物"
+          if [ -s /tmp/cloudmusic-web-dist.tgz ]; then
+            $SUDO rm -rf "$APPDIR/web/dist"
+            $SUDO install -d -m 755 "$APPDIR/web/dist"
+            $SUDO tar -xzf /tmp/cloudmusic-web-dist.tgz -C "$APPDIR/web/dist"
+            rm -f /tmp/cloudmusic-web-dist.tgz
+            if [ ! -f "$APPDIR/web/dist/index.html" ]; then
+              echo "::error::前端产物缺少 index.html"
+              exit 5
+            fi
+            echo "  前端产物：$(du -sh "$APPDIR/web/dist" | cut -f1)，$(find "$APPDIR/web/dist" -type f | wc -l) 个文件"
+          else
+            echo "::warning::没有收到前端产物，本轮只更新后端 API"
+          fi
+
+          log "5/9 安装服务端依赖"
           cd "$APPDIR/server"
           $SUDO npm ci --omit=dev --no-audit --no-fund
 
-          log "5/8 生成环境变量与数据目录"
+          log "6/9 生成环境变量与数据目录"
           $SUDO install -d -m 750 /var/lib/cloudmusic
           $SUDO install -d -m 700 /etc/cloudmusic
           SECRET=""
@@ -176,7 +206,7 @@ jobs:
           ENVFILE
           $SUDO chmod 600 /etc/cloudmusic/env
 
-          log "6/8 写入 systemd 并启动"
+          log "7/9 写入 systemd 并启动"
           NODE_BIN="$(command -v node)"
           $SUDO tee /etc/systemd/system/cloudmusic.service >/dev/null <<UNIT
           [Unit]
@@ -205,7 +235,7 @@ jobs:
           curl -fsS "http://127.0.0.1:$PORT/api/health"
           echo
 
-          log "7/8 配置 nginx 反向代理"
+          log "8/9 配置 nginx 反向代理"
           NGINX_BIN="/www/server/nginx/sbin/nginx"
           if [ ! -x "$NGINX_BIN" ]; then NGINX_BIN="$(command -v nginx || true)"; fi
           if [ -z "$NGINX_BIN" ]; then
@@ -225,6 +255,14 @@ jobs:
           fi
           echo "nginx 模式：$NGINX_OWNER（$NGINX_BIN，vhost $VHOST_DIR）"
           $SUDO mkdir -p "$WEBROOT/.well-known/acme-challenge"
+          if [ -f "$APPDIR/web/dist/index.html" ]; then
+            if [ -f "$WEBROOT/index.html" ] && [ ! -f "$WEBROOT/index.html.placeholder.bak" ]; then
+              $SUDO cp -a "$WEBROOT/index.html" "$WEBROOT/index.html.placeholder.bak"
+              echo "  原占位页已备份为 index.html.placeholder.bak"
+            fi
+            $SUDO install -m 644 "$APPDIR/web/dist/index.html" "$WEBROOT/index.html"
+            echo "  首页已同步到 $WEBROOT/index.html"
+          fi
 
           CONF="$VHOST_DIR/$DOMAIN.conf"
           if [ -f "$CONF" ]; then
@@ -283,7 +321,17 @@ jobs:
             exit 4
           fi
 
-          log "8/8 申请 HTTPS 证书"
+          ROOT_BODY="$(curl -k -sS -m 15 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/" 2>/dev/null || true)"
+          if printf '%s' "$ROOT_BODY" | grep -q 'id="root"'; then
+            echo "  自测通过：根路径返回应用首页"
+          elif [ -f "$APPDIR/web/dist/index.html" ]; then
+            echo "::error::根路径没有返回应用首页（检查 $WEBROOT/index.html 与站点配置）"
+            exit 6
+          else
+            echo "  未构建前端产物，根路径保持占位页"
+          fi
+
+          log "9/9 申请 HTTPS 证书"
           CRT=""
           KEY=""
           if [ -f "$CERT_DIR/$DOMAIN.crt" ]; then
@@ -364,7 +412,10 @@ jobs:
           SKIP_CERTBOT: ${{ inputs.skip_certbot || 'false' }}
         run: |
           set -euo pipefail
+          tar -czf web-dist.tgz -C web/dist .
+          ls -lh web-dist.tgz
           scp -q remote-setup.sh target:/tmp/cloudmusic-setup.sh
+          scp -q web-dist.tgz target:/tmp/cloudmusic-web-dist.tgz
           ssh -tt target "DOMAIN='$DOMAIN' PORT='$PORT' APPDIR='$APPDIR' SKIP_CERTBOT='$SKIP_CERTBOT' WANT_SHA='$GITHUB_SHA' bash /tmp/cloudmusic-setup.sh"
 
       - name: Verify from runner
@@ -381,4 +432,20 @@ jobs:
             sleep 5
           done
           echo "::error::https://$DOMAIN/api/health 未返回 cloudmusic"
+          exit 1
+
+      - name: Verify web ui
+        env:
+          DOMAIN: ${{ inputs.domain || 'music.lichenlc.cn' }}
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            ROOT="$(curl -fsS --max-time 15 "https://$DOMAIN/" || true)"
+            echo "try $i root: $(printf '%s' "$ROOT" | tr -d '\n' | head -c 100)"
+            case "$ROOT" in
+              *'id="root"'*) echo "前端首页已生效"; exit 0 ;;
+            esac
+            sleep 5
+          done
+          echo "::error::https://$DOMAIN/ 没有返回前端首页"
           exit 1
