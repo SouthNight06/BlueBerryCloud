@@ -77,7 +77,7 @@ export async function checkServer(value: string): Promise<boolean> {
     const response = await fetch(`${base}/api/health`, { method: "GET" });
     if (!response.ok) return false;
     const payload = (await response.json()) as { name?: string };
-    return payload?.name === "xiaoyun-changting";
+    return payload?.name === "cloudmusic";
   } catch {
     return false;
   }

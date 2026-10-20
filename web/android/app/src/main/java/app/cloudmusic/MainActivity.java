@@ -1,4 +1,4 @@
-package app.xiaoyun.changting;
+package app.cloudmusic;
 
 import com.getcapacitor.BridgeActivity;
 

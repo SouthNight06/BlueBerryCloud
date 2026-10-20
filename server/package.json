@@ -1,6 +1,6 @@
 {
-  "name": "xiaoyun-changting-server",
-  "version": "1.0.0",
+  "name": "cloudmusic-server",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "小云畅听 backend — Express + node:sqlite",

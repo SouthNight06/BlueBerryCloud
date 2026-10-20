@@ -35,7 +35,7 @@ export const CORS_ORIGINS = (process.env.CORS_ORIGINS || "*")
   .filter(Boolean);
 
 export const JWT_SECRET =
-  process.env.JWT_SECRET || "xiaoyun-changting-dev-secret-change-me";
+  process.env.JWT_SECRET || "cloudmusic-dev-secret-change-me";
 export const MAX_UPLOAD_BYTES = Number(
   process.env.MAX_UPLOAD_BYTES || 200 * 1024 * 1024
 );

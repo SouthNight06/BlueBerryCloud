@@ -4,14 +4,14 @@ def releaseKeystore = System.getenv("XIAOYUN_KEYSTORE_PATH")
 def hasReleaseKeystore = releaseKeystore != null && file(releaseKeystore).exists()
 
 android {
-    namespace "app.xiaoyun.changting"
+    namespace "app.cloudmusic"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "app.xiaoyun.changting"
+        applicationId "app.cloudmusic"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.01"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -1,11 +1,11 @@
 {
-  "name": "xiaoyun-changting-desktop",
+  "name": "cloudmusic-desktop",
   "productName": "小云畅听",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "小云畅听 · 小云屋出品的多端音乐播放器桌面端",
   "author": "小云屋",
-  "desktopName": "xiaoyun-changting.desktop",
+  "desktopName": "cloudmusic.desktop",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -22,9 +22,9 @@
     "esbuild": "^0.25.12"
   },
   "build": {
-    "appId": "app.xiaoyun.changting",
+    "appId": "app.cloudmusic",
     "productName": "小云畅听",
-    "artifactName": "XiaoyunChangting-${version}.${ext}",
+    "artifactName": "CloudMusic-${version}.${ext}",
     "directories": {
       "output": "release",
       "buildResources": "assets"
@@ -50,7 +50,7 @@
       "target": ["AppImage"],
       "category": "AudioVideo",
       "icon": "assets/icon.png",
-      "executableName": "xiaoyun-changting",
+      "executableName": "cloudmusic",
       "synopsis": "小云畅听 · 多端音乐播放器",
       "syncDesktopName": true
     },

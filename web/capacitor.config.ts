@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "app.xiaoyun.changting",
+  appId: "app.cloudmusic",
   appName: "小云畅听",
   webDir: "dist",
   android: {

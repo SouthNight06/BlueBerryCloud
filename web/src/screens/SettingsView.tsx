@@ -8,7 +8,7 @@ import { useApp } from "../state/AppStore";
 import { useToast } from "../state/ToastStore";
 import { useUi } from "../state/UiStore";
 
-const VERSION = "1.0.0";
+const VERSION = "1.01";
 
 const CREDITS = [
   {

@@ -23,13 +23,13 @@ jobs:
         include:
           - os: ubuntu-latest
             target: linux
-            artifact: XiaoyunChangting-*.AppImage
+            artifact: CloudMusic-*.AppImage
           - os: windows-latest
             target: win
-            artifact: XiaoyunChangting-*.exe
+            artifact: CloudMusic-*.exe
           - os: macos-latest
             target: mac
-            artifact: XiaoyunChangting-*.dmg
+            artifact: CloudMusic-*.dmg
     steps:
       - uses: actions/checkout@v4
 
@@ -115,7 +115,7 @@ jobs:
           else
             keytool -genkeypair -v -keystore ci-debug.jks -storepass xiaoyun123456 \
               -keypass xiaoyun123456 -alias xiaoyun -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Xiaoyun Changting, O=Xiaoyun House, C=CN"
+              -dname "CN=CloudMusic, O=Xiaoyun House, C=CN"
             echo "XIAOYUN_KEYSTORE_PATH=$PWD/ci-debug.jks" >> "$GITHUB_ENV"
           fi
           echo "XIAOYUN_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'xiaoyun123456' }}" >> "$GITHUB_ENV"
@@ -130,8 +130,8 @@ jobs:
         run: |
           mkdir -p ../../out
           cp app/build/outputs/apk/release/app-release*.apk \
-             "../../out/XiaoyunChangting-${GITHUB_REF_NAME#v}.apk" 2>/dev/null \
-            || cp app/build/outputs/apk/release/app-release*.apk "../../out/XiaoyunChangting.apk"
+             "../../out/CloudMusic-${GITHUB_REF_NAME#v}.apk" 2>/dev/null \
+            || cp app/build/outputs/apk/release/app-release*.apk "../../out/CloudMusic.apk"
         working-directory: web/android
 
       - uses: actions/upload-artifact@v4

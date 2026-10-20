@@ -312,7 +312,7 @@ router.get(
 
     const upstream = await fetch(target, {
       signal: AbortSignal.timeout(60_000),
-      headers: { "User-Agent": "XiaoyunChangting/1.0 (personal music player)" },
+      headers: { "User-Agent": "CloudMusic/1.01 (personal music player)" },
     });
     if (!upstream.ok || !upstream.body) throw new HttpError(502, "download_failed");
 

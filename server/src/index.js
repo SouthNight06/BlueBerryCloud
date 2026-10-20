@@ -39,7 +39,7 @@ app.use((req, res, next) => {
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
-    name: "xiaoyun-changting",
+    name: "cloudmusic",
     uptime: Math.round(process.uptime()),
   });
 });
