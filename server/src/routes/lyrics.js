@@ -7,7 +7,7 @@ import { ownedTrack } from "../tracks.js";
 
 const router = Router();
 const USER_AGENT =
-  "CloudMusic/1.0.3 (personal music player; https://github.com/SouthNight06/BlueBerryCloud)";
+  "CloudMusic/1.0.4 (personal music player; https://github.com/SouthNight06/BlueBerryCloud)";
 
 function toLyric(row) {
   if (!row) return null;

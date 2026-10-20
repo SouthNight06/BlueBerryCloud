@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { withToken } from "../api/client";
 import type { Track } from "../api/types";
+import { bandRanges, resetWaveBus, waveBus } from "../lib/spectrum";
 import { useApp } from "./AppStore";
 import { useToast } from "./ToastStore";
 
@@ -170,6 +171,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       delete root.dataset.dj;
       root.style.removeProperty("--dj-energy");
       root.style.removeProperty("--dj-beat");
+      root.style.removeProperty("--dj-squash");
+      root.style.removeProperty("--dj-lift");
       root.style.removeProperty("--dj-strength");
       return;
     }
@@ -183,51 +186,131 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       delete root.dataset.dj;
       root.style.removeProperty("--dj-energy");
       root.style.removeProperty("--dj-beat");
+      root.style.removeProperty("--dj-squash");
+      root.style.removeProperty("--dj-lift");
       root.style.removeProperty("--dj-strength");
     },
     [],
   );
 
   useEffect(() => {
-    if (!djMode || !playing) return;
+    if (!playing) {
+      resetWaveBus();
+      return;
+    }
     ensureGraph();
     const analyser = analyserRef.current;
     if (!analyser) return;
+
     const root = document.documentElement;
+    const bins = analyser.frequencyBinCount;
     const time = new Float32Array(analyser.fftSize);
-    const freq = new Uint8Array(analyser.frequencyBinCount);
+    const freq = new Uint8Array(bins);
+    const ranges = bandRanges(bins, analyser.context.sampleRate);
+    const levels = waveBus.levels;
+    const lowBins = Math.max(4, Math.min(bins - 1, Math.round(240 / (analyser.context.sampleRate / 2 / bins))));
+    const previous = new Float32Array(lowBins + 1);
+
     let energy = 0;
+    let fluxFloor = 0;
+    let lastHit = -1;
+    let gap = 320;
+    let squash = 0;
+    let lift = 0;
     let beat = 0;
-    let bassFloor = 0;
     let last = 0;
-    let frame = 0;
+    let raf = 0;
+
     const tick = (now: number) => {
-      frame = window.requestAnimationFrame(tick);
-      if (now - last < 32) return;
+      raf = window.requestAnimationFrame(tick);
+      if (now - last < 18) return;
       last = now;
+
+      analyser.getByteFrequencyData(freq);
       analyser.getFloatTimeDomainData(time);
+
       let sum = 0;
       for (let i = 0; i < time.length; i += 1) sum += time[i] * time[i];
       const rms = Math.sqrt(sum / time.length);
-      analyser.getByteFrequencyData(freq);
-      let bass = 0;
-      for (let i = 1; i < 12; i += 1) bass += freq[i];
-      bass = bass / 11 / 255;
-      energy = energy * 0.76 + Math.min(1, rms / 0.12) * 0.24;
-      bassFloor = bassFloor * 0.9 + bass * 0.1;
-      if (bass > 0.3 && bass > bassFloor * 1.14 && beat < 0.45) beat = 1;
-      beat *= 0.86;
-      if (beat < 0.01) beat = 0;
-      root.style.setProperty("--dj-energy", energy.toFixed(3));
-      root.style.setProperty("--dj-beat", beat.toFixed(3));
+
+      for (let i = 0; i < ranges.length; i += 1) {
+        const [from, to] = ranges[i];
+        let value = 0;
+        for (let j = from; j <= to; j += 1) value += freq[j];
+        value = value / (to - from + 1) / 255;
+        const prev = levels[i];
+        levels[i] = value > prev ? value : prev * 0.78 + value * 0.22;
+      }
+
+      let flux = 0;
+      for (let i = 1; i <= lowBins; i += 1) {
+        const value = freq[i] / 255;
+        const diff = value - previous[i];
+        if (diff > 0) flux += diff;
+        previous[i] = value;
+      }
+      flux /= lowBins;
+
+      fluxFloor = fluxFloor * 0.92 + flux * 0.08;
+      const threshold = Math.max(0.006, fluxFloor * 1.22);
+      const sinceHit = lastHit < 0 ? Infinity : now - lastHit;
+      const cycle = Math.min(430, Math.max(250, gap));
+      const starved = sinceHit > cycle * 1.9;
+      const onset = flux > threshold || (starved && rms > 0.02 && flux > threshold * 0.4);
+
+      if (onset && sinceHit > 150) {
+        if (lastHit > 0 && sinceHit < 900) gap = gap * 0.55 + sinceHit * 0.45;
+        lastHit = now;
+      }
+
+      const age = lastHit < 0 ? Infinity : now - lastHit;
+      const crouch = cycle * 0.26;
+      if (age < crouch) {
+        squash = Math.sin((age / crouch) * Math.PI);
+      } else {
+        squash = 0;
+      }
+      const launch = cycle * 0.12;
+      const span = cycle - launch;
+      if (age >= launch && age < cycle) {
+        const phase = (age - launch) / span;
+        lift =
+          phase < 0.3
+            ? Math.sin((phase / 0.3) * Math.PI * 0.5)
+            : Math.cos(((phase - 0.3) / 0.7) * Math.PI * 0.5);
+      } else {
+        lift = 0;
+      }
+      beat = Math.max(squash, lift);
+
+      energy = energy * 0.9 + Math.min(1, rms / 0.14) * 0.1;
+
+      waveBus.energy = energy;
+      waveBus.beat = beat;
+      waveBus.squash = squash;
+      waveBus.lift = lift;
+      waveBus.active = true;
+
+      if (djMode) {
+        root.style.setProperty("--dj-energy", energy.toFixed(3));
+        root.style.setProperty("--dj-beat", beat.toFixed(3));
+        root.style.setProperty("--dj-squash", squash.toFixed(3));
+        root.style.setProperty("--dj-lift", lift.toFixed(3));
+      }
     };
-    frame = window.requestAnimationFrame(tick);
+
+    raf = window.requestAnimationFrame(tick);
     return () => {
-      window.cancelAnimationFrame(frame);
-      root.style.setProperty("--dj-energy", "0");
-      root.style.setProperty("--dj-beat", "0");
+      window.cancelAnimationFrame(raf);
+      resetWaveBus();
+      if (djMode) {
+        root.style.setProperty("--dj-energy", "0");
+        root.style.setProperty("--dj-beat", "0");
+        root.style.setProperty("--dj-squash", "0");
+        root.style.setProperty("--dj-lift", "0");
+      }
     };
-  }, [djMode, playing, ensureGraph]);
+  }, [playing, djMode, ensureGraph]);
 
   useEffect(() => {
     const audio = audioRef.current;

@@ -4,6 +4,7 @@ import { usePlayer } from "../state/PlayerStore";
 import { useUi } from "../state/UiStore";
 import { Artwork } from "./Artwork";
 import { Icon } from "./Icon";
+import { Waveform } from "./Waveform";
 
 export function PlayerBar() {
   const {
@@ -31,6 +32,8 @@ export function PlayerBar() {
 
   return (
     <div className="player">
+      <Waveform />
+
       <div className="player__line">
         <span style={{ width: `${percent}%` }} />
       </div>

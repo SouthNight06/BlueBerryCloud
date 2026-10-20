@@ -189,6 +189,8 @@ svg {
   :root[data-dj] {
     --dj-beat: 0 !important;
     --dj-energy: 0 !important;
+    --dj-squash: 0 !important;
+    --dj-lift: 0 !important;
     --dj-strength: 0 !important;
   }
 }
