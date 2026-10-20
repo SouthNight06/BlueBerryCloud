@@ -67,6 +67,26 @@ CREATE TABLE IF NOT EXISTS user_settings (
   preferences  TEXT NOT NULL DEFAULT '{}',
   updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS lyrics (
+  track_id   INTEGER PRIMARY KEY,
+  owner_id   INTEGER NOT NULL,
+  lrc        TEXT NOT NULL,
+  source     TEXT NOT NULL DEFAULT 'manual',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS bili_accounts (
+  user_id    INTEGER PRIMARY KEY,
+  sessdata   TEXT NOT NULL,
+  bili_jct   TEXT NOT NULL DEFAULT '',
+  dedeuserid TEXT NOT NULL DEFAULT '',
+  uname      TEXT NOT NULL DEFAULT '',
+  face       TEXT,
+  vip        INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
 db.exec(

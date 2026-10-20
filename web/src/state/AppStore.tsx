@@ -29,6 +29,8 @@ type AppValue = {
   attempt: <T>(action: () => Promise<T>) => Promise<T | null>;
   refresh: () => Promise<void>;
   ensureTrack: (result: SearchResult) => Promise<Track>;
+  adoptTrack: (track: Track) => void;
+  updatePreferences: (patch: Record<string, unknown>) => Promise<void>;
   uploadTrack: (file: File) => Promise<Track>;
   deleteTrack: (id: number) => Promise<void>;
   downloadTrack: (track: Track) => void;
@@ -121,6 +123,26 @@ export function AppProvider({
       return track;
     },
     [tracks],
+  );
+
+  const adoptTrack = useCallback((track: Track) => {
+    setTracks((list) => (list.some((item) => item.id === track.id) ? list : [track, ...list]));
+  }, []);
+
+  const updatePreferences = useCallback(
+    async (patch: Record<string, unknown>) => {
+      const previous = settings?.preferences ?? {};
+      const next = { ...previous, ...patch };
+      setSettings((current) => (current ? { ...current, preferences: next } : current));
+      try {
+        const { settings: saved } = await api.patchSettings({ preferences: next });
+        setSettings(saved);
+      } catch (error) {
+        setSettings((current) => (current ? { ...current, preferences: previous } : current));
+        throw error;
+      }
+    },
+    [settings],
   );
 
   const uploadTrack = useCallback(async (file: File) => {
@@ -283,6 +305,8 @@ export function AppProvider({
       attempt,
       refresh,
       ensureTrack,
+      adoptTrack,
+      updatePreferences,
       uploadTrack,
       deleteTrack,
       downloadTrack,
@@ -311,6 +335,8 @@ export function AppProvider({
       attempt,
       refresh,
       ensureTrack,
+      adoptTrack,
+      updatePreferences,
       uploadTrack,
       deleteTrack,
       downloadTrack,

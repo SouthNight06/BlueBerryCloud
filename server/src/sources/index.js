@@ -1,9 +1,11 @@
+import { bilibiliSource } from "./bilibili.js";
 import { demoSource } from "./demoCatalog.js";
 import { internetArchiveSource } from "./internetArchive.js";
 
 const registry = new Map();
 registry.set(demoSource.id, demoSource);
 registry.set(internetArchiveSource.id, internetArchiveSource);
+registry.set(bilibiliSource.id, bilibiliSource);
 
 export function listSources() {
   return [...registry.values()].map(
@@ -23,10 +25,10 @@ export function getSource(id) {
 
 export const ALL_SOURCES = "all";
 
-export async function searchAll(query, { limit = 20 } = {}) {
+export async function searchAll(query, { limit = 20, userId = null } = {}) {
   const adapters = [...registry.values()];
   const outcomes = await Promise.allSettled(
-    adapters.map((adapter) => adapter.search(query, { limit })),
+    adapters.map((adapter) => adapter.search(query, { limit, userId })),
   );
 
   const results = [];

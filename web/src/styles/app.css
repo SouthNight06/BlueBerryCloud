@@ -35,7 +35,7 @@
 }
 
 .rail__word {
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -44,7 +44,7 @@
 
 .rail__word small {
   display: block;
-  font-family: var(--font-sans);
+  font-family: var(--font-cute);
   font-size: 10.5px;
   font-weight: 400;
   letter-spacing: 0.06em;
@@ -166,7 +166,7 @@
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-size: 13px;
   font-weight: 600;
 }
@@ -219,7 +219,7 @@
 }
 
 .view__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-size: clamp(25px, 2.6vw, 33px);
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -289,7 +289,7 @@
 }
 
 .art__glyph {
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -797,7 +797,7 @@
 }
 
 .themecard__name {
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-size: 15.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -941,7 +941,7 @@
   border-radius: calc(var(--field-radius) * 0.8);
   background: var(--surface);
   font-size: 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-cute);
   min-width: 0;
 }
 
@@ -1027,7 +1027,7 @@
 }
 
 .booting__word {
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-size: 22px;
   letter-spacing: -0.01em;
   color: var(--text-muted);
@@ -1056,13 +1056,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-size: 17px;
   letter-spacing: -0.01em;
 }
 
 .auth__pitch {
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-size: clamp(26px, 3.1vw, 40px);
   font-weight: 600;
   line-height: 1.32;
@@ -1108,7 +1108,7 @@
 }
 
 .auth__title {
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-size: 25px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -1186,6 +1186,594 @@
   color: var(--text-muted);
   font-size: 11.5px;
   text-align: center;
+}
+
+/* ── settings ──────────────────────────────────────────────────────── */
+
+.setgroup {
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--panel-radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.setrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 18px;
+}
+
+.setrow + .setrow {
+  border-top: 1px solid var(--hairline);
+}
+
+.setrow--foot {
+  flex-wrap: wrap;
+  background: color-mix(in oklab, var(--bg-soft) 55%, transparent);
+}
+
+.setrow__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.setrow__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-cute);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.setrow__desc {
+  max-width: 64ch;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.setrow__act {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: none;
+  flex-wrap: wrap;
+}
+
+.setavatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--hairline);
+  border-radius: calc(var(--radius) * 0.55);
+  background: color-mix(in oklab, var(--accent) 13%, var(--surface));
+  color: var(--accent);
+  font-family: var(--font-cute);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.setavatar--img {
+  object-fit: cover;
+  padding: 0;
+}
+
+.setbadge {
+  padding: 1px 7px;
+  border: 1px solid color-mix(in oklab, var(--accent) 36%, transparent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-family: var(--font-cute);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.setbytes {
+  min-width: 64px;
+  font-family: var(--font-cute);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.setcount {
+  min-width: 58px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.setlink {
+  font-size: 12.5px;
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in oklab, var(--accent) 32%, transparent);
+  transition: border-color 0.16s var(--ease);
+}
+
+.setlink:hover {
+  border-color: var(--accent);
+}
+
+.switch {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  flex: none;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--text) 8%, transparent);
+  transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.22s var(--ease), background-color 0.2s var(--ease);
+}
+
+.switch[data-on="true"] {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.switch[data-on="true"] .switch__knob {
+  transform: translateX(20px);
+  background: var(--accent-contrast);
+}
+
+/* ── bilibili ──────────────────────────────────────────────────────── */
+
+.bilicard {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 20px;
+  padding: 14px 18px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--panel-radius);
+  background: var(--surface);
+}
+
+.bilicard__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.bilicard__body strong {
+  font-family: var(--font-cute);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.bilicard__meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.bili__legend-acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bili__batch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bili__batch-bar {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--bg-soft);
+}
+
+.bili__batch-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s var(--ease);
+}
+
+.bili__batch .num {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.bili__more {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.bili__pages {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bili__page {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: calc(var(--field-radius) * 0.7);
+  cursor: pointer;
+  transition: background-color 0.14s var(--ease);
+}
+
+.bili__page:hover {
+  background: var(--row-hover);
+}
+
+.bili__page input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.bili__page-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bili__page-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.biliqr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0 2px;
+}
+
+.biliqr__code {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--field-radius);
+  background: #ffffff;
+}
+
+.biliqr__code svg {
+  display: block;
+  width: 208px;
+  height: 208px;
+}
+
+.biliqr__state {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.biliqr__state[data-state="ok"] {
+  color: var(--accent);
+}
+
+.biliqr__hint {
+  max-width: 34ch;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  text-align: center;
+}
+
+/* ── lyrics panel ──────────────────────────────────────────────────── */
+
+.lyric__tabs {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.lyric__edit,
+.lyric__search,
+.lyric__ai {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lyric__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lyric__now {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lyric__textfield {
+  width: 100%;
+  min-height: 258px;
+  max-height: 42dvh;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--field-radius);
+  background: var(--bg-soft);
+  font-family: var(--font-cute);
+  font-size: 12.5px;
+  line-height: 1.85;
+  resize: vertical;
+}
+
+.lyric__textfield:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.lyric__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.lyric__results {
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--hairline);
+  border-radius: var(--field-radius);
+}
+
+.lyric__result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.lyric__result + .lyric__result {
+  border-top: 1px solid var(--hairline);
+}
+
+.lyric__result-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.lyric__result-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyric__result-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyric__meta {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lyric__foot-acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── desktop lyrics ────────────────────────────────────────────────── */
+
+.dlyric {
+  position: fixed;
+  z-index: 95;
+  width: min(560px, calc(100vw - 26px));
+  padding: 8px 12px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: calc(var(--radius) * 0.9);
+  background: color-mix(in oklab, var(--surface) 84%, transparent);
+  box-shadow: var(--glow);
+  backdrop-filter: saturate(160%) blur(20px);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  font-family: var(--font-cute);
+  user-select: none;
+  touch-action: none;
+  animation: rise-in 0.2s var(--ease);
+}
+
+.dlyric__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+
+.dlyric__grab {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: grab;
+}
+
+.dlyric__grab:active {
+  cursor: grabbing;
+}
+
+.dlyric__grab span {
+  width: 12px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 -4px 0 currentColor, 0 4px 0 currentColor;
+  opacity: 0.65;
+}
+
+.dlyric__track {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dlyric__act {
+  width: 24px;
+  height: 24px;
+}
+
+.dlyric__stage {
+  display: grid;
+  gap: 6px;
+  padding: 2px 6px 0;
+  text-align: center;
+}
+
+.dlyric__side {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  opacity: 0.72;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity 0.24s var(--ease);
+}
+
+.dlyric__side--prev {
+  opacity: 0.5;
+}
+
+.dlyric__now {
+  font-size: clamp(18px, 2.4vw, 22px);
+  font-weight: 600;
+  line-height: 1.42;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  text-wrap: balance;
+  animation: lyric-in 0.34s var(--ease);
+}
+
+.dlyric__now:not(.dlyric__now--idle) {
+  background-image: linear-gradient(
+    90deg,
+    var(--accent) var(--p, 0%),
+    var(--text) var(--p, 0%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 14px color-mix(in oklab, var(--accent) 26%, transparent));
+}
+
+.dlyric__now--idle {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-muted);
+  animation: none;
+}
+
+@keyframes lyric-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.988);
+  }
+}
+
+/* ── dj mode ───────────────────────────────────────────────────────── */
+
+:root[data-dj="on"] {
+  --dj-pop: calc(1 + var(--dj-beat, 0) * 0.06 + var(--dj-energy, 0) * 0.02);
+  --dj-pop-md: calc(1 + var(--dj-beat, 0) * 0.04 + var(--dj-energy, 0) * 0.013);
+  --dj-pop-sm: calc(1 + var(--dj-beat, 0) * 0.016 + var(--dj-energy, 0) * 0.006);
+  --dj-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+:root[data-dj="on"] .art,
+:root[data-dj="on"] .avatar,
+:root[data-dj="on"] .setavatar {
+  scale: var(--dj-pop);
+  transition: scale 90ms var(--dj-spring);
+  will-change: scale;
+}
+
+:root[data-dj="on"] .art {
+  filter: saturate(calc(1 + var(--dj-energy, 0) * 0.14))
+    brightness(calc(1 + var(--dj-beat, 0) * 0.06));
+}
+
+:root[data-dj="on"] .serif,
+:root[data-dj="on"] .view__title,
+:root[data-dj="on"] .player__title,
+:root[data-dj="on"] .row__title,
+:root[data-dj="on"] .setrow__title,
+:root[data-dj="on"] .themecard__name,
+:root[data-dj="on"] .bilicard__body,
+:root[data-dj="on"] .dlyric__now,
+:root[data-dj="on"] .dlyric__side,
+:root[data-dj="on"] .btn,
+:root[data-dj="on"] .ibtn,
+:root[data-dj="on"] .chip,
+:root[data-dj="on"] .player__play,
+:root[data-dj="on"] .switch {
+  scale: var(--dj-pop-md);
+}
+
+:root[data-dj="on"] .navlink,
+:root[data-dj="on"] .plcard,
+:root[data-dj="on"] .themecard,
+:root[data-dj="on"] .bilicard {
+  scale: var(--dj-pop-sm);
+}
+
+:root[data-dj="on"] .switch__knob {
+  scale: calc(1 + var(--dj-beat, 0) * 0.08);
 }
 
 /* ── responsive ────────────────────────────────────────────────────── */
@@ -1348,5 +1936,30 @@
 
   .tokenrow {
     grid-template-columns: 84px minmax(0, 1fr) auto;
+  }
+
+  .setrow {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 13px 15px;
+  }
+
+  .setrow__act {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .setavatar {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+  }
+
+  .dlyric {
+    padding: 6px 10px 13px;
+  }
+
+  .dlyric__now {
+    font-size: 17px;
   }
 }

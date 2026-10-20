@@ -19,6 +19,8 @@ export const DATA_ROOT = process.env.XIAOYUN_DATA_DIR
 export const DATA_DIR = path.join(DATA_ROOT, "data");
 export const UPLOAD_DIR = path.join(DATA_ROOT, "uploads");
 export const MEDIA_DIR = path.join(DATA_ROOT, "media");
+export const CACHE_DIR = path.join(DATA_DIR, "cache");
+export const COVER_CACHE_DIR = path.join(CACHE_DIR, "covers");
 
 export const WEB_DIST = process.env.XIAOYUN_WEB_DIST
   ? path.resolve(process.env.XIAOYUN_WEB_DIST)
@@ -38,6 +40,10 @@ export const MAX_UPLOAD_BYTES = Number(
   process.env.MAX_UPLOAD_BYTES || 200 * 1024 * 1024
 );
 
-for (const dir of [DATA_DIR, UPLOAD_DIR, MEDIA_DIR]) {
+export const AI_BASE_URL = (process.env.XIAOYUN_AI_BASE_URL || "").replace(/\/+$/, "");
+export const AI_KEY = process.env.XIAOYUN_AI_KEY || "";
+export const AI_MODEL = process.env.XIAOYUN_AI_MODEL || "gpt-4o-mini";
+
+for (const dir of [DATA_DIR, UPLOAD_DIR, MEDIA_DIR, CACHE_DIR, COVER_CACHE_DIR]) {
   fs.mkdirSync(dir, { recursive: true });
 }

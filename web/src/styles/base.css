@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "MaokenZhuyuanTi";
+  src: url("/fonts/MaokenZhuyuanTi-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #f3f6fd;
   --bg-soft: #e8eef9;
@@ -27,6 +35,8 @@
   --font-serif: "Noto Serif CJK SC", "Noto Serif SC", "Songti SC", "Source Han Serif SC",
     ui-serif, Georgia, "Times New Roman", serif;
   --font-mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-cute: "Comic Sans MS", "Comic Sans", "MaokenZhuyuanTi", "猫啃珠圆体",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-rounded, var(--font-sans);
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --btn-radius: calc(var(--radius) * 0.58);
@@ -58,7 +68,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-sans);
+  font-family: var(--font-cute);
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -118,13 +128,14 @@ svg {
 }
 
 .serif {
-  font-family: var(--font-serif);
+  font-family: var(--font-cute);
   font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.16;
 }
 
 .num {
+  font-family: var(--font-cute);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
@@ -173,5 +184,10 @@ svg {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+
+  :root[data-dj] {
+    --dj-beat: 0 !important;
+    --dj-energy: 0 !important;
   }
 }

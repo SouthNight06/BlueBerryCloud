@@ -18,6 +18,19 @@ export function formatTotalDuration(tracks: { duration: number | null }[]): stri
   return `${hours} 小时 ${minutes % 60} 分`;
 }
 
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const rounded = unit === 0 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded} ${units[unit]}`;
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return "";
   const normalized = value.includes("T") ? value : value.replace(" ", "T") + "Z";
@@ -45,6 +58,21 @@ const ERROR_COPY: Record<string, string> = {
   file_required: "请选择音频文件",
   no_audio_source: "该曲目没有可播放的音频",
   download_failed: "下载失败，请稍后再试",
+  bilibili_login_required: "请先登录哔哩哔哩账号",
+  bilibili_cookie_missing: "登录信息不完整，请重新扫码登录",
+  bilibili_invalid_id: "这不是有效的哔哩哔哩视频编号",
+  bilibili_page_missing: "该视频没有可用的分 P",
+  bilibili_account_expired: "哔哩哔哩登录已失效，请重新扫码",
+  bili_login_expired: "哔哩哔哩登录已失效，请重新扫码",
+  bili_no_audio: "该视频没有可下载的音频流",
+  bili_folder_failed: "无法读取哔哩哔哩收藏夹",
+  bili_qr_failed: "二维码生成失败，请稍后重试",
+  lyrics_unreachable: "歌词服务暂时不可用",
+  ai_not_configured: "服务器还没有配置 AI 接口",
+  ai_unreachable: "AI 服务连接失败",
+  ai_invalid_lyric: "AI 返回的内容不是有效的 LRC 歌词",
+  target_invalid: "清理目标不正确",
+  id_invalid: "参数不正确",
 };
 
 export function describeError(error: unknown): string {
@@ -56,6 +84,9 @@ export function describeError(error: unknown): string {
       return `音源 ${source} 暂时不可用，可改用其他来源`;
     }
     if (code.startsWith("source_resolve_failed")) return "该曲目无法解析音频地址";
+    if (code.startsWith("bilibili_failed:")) return "哔哩哔哩暂时没有响应，请稍后再试";
+    if (code.startsWith("lyrics_http_")) return "歌词服务返回异常，请稍后再试";
+    if (code.startsWith("ai_http_")) return "AI 服务返回异常，请稍后再试";
     if (code.startsWith("token_")) return "主题中有不合法的取值";
     return code.replace(/_/g, " ");
   }

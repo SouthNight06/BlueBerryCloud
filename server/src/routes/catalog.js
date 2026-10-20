@@ -16,6 +16,7 @@ import {
 } from "../http.js";
 import { toTrack } from "../serializers.js";
 import { ALL_SOURCES, getSource, listSources, searchAll } from "../sources/index.js";
+import { discardFile, findBySource, insertPrepared } from "../tracks.js";
 import { audioUpload, resolveMediaPath, resolveUploadPath } from "../upload.js";
 
 const router = Router();
@@ -84,7 +85,7 @@ router.get(
     }
 
     if (sourceId === ALL_SOURCES) {
-      const payload = await searchAll(query, { limit });
+      const payload = await searchAll(query, { limit, userId: req.user.uid });
       cacheSearch(key, payload);
       res.json({ ...payload, cached: false });
       return;
@@ -95,9 +96,9 @@ router.get(
 
     let results;
     try {
-      results = await source.search(query, { limit });
-    } catch {
-      throw new HttpError(502, `source_unavailable:${sourceId}`);
+      results = await source.search(query, { limit, userId: req.user.uid });
+    } catch (error) {
+      throw new HttpError(502, `source_unavailable:${sourceId}:${error.message ?? "failed"}`);
     }
 
     const payload = {
@@ -146,9 +147,24 @@ router.post(
 
     let resolved;
     try {
-      resolved = await source.resolve(sourceItemId);
+      resolved = await source.resolve(sourceItemId, { userId: req.user.uid });
     } catch (error) {
       throw new HttpError(502, `source_resolve_failed:${error.message ?? sourceId}`);
+    }
+
+    if (resolved?.filePath) {
+      const clash =
+        resolved.sourceId && resolved.sourceId !== sourceItemId
+          ? findBySource(req.user.uid, sourceId, resolved.sourceId)
+          : null;
+      if (clash) {
+        discardFile(resolved.filePath);
+        res.json({ track: toTrack(clash), duplicated: true });
+        return;
+      }
+      const row = insertPrepared(req.user.uid, sourceId, resolved);
+      res.status(201).json({ track: toTrack(row), duplicated: false });
+      return;
     }
 
     const { lastInsertRowid } = run(

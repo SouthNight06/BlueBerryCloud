@@ -5,6 +5,7 @@ import { AppShell } from "./components/AppShell";
 import { AuthScreen } from "./screens/AuthScreen";
 import { AppProvider } from "./state/AppStore";
 import { PlayerProvider } from "./state/PlayerStore";
+import { UiProvider } from "./state/UiStore";
 
 export function App() {
   const [user, setUser] = useState<PublicUser | null>(null);
@@ -57,9 +58,11 @@ export function App() {
 
   return (
     <AppProvider user={user} onLogout={handleLogout}>
-      <PlayerProvider>
-        <AppShell />
-      </PlayerProvider>
+      <UiProvider>
+        <PlayerProvider>
+          <AppShell />
+        </PlayerProvider>
+      </UiProvider>
     </AppProvider>
   );
 }

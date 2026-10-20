@@ -29,6 +29,12 @@ export type IconName =
   | "cloud"
   | "note"
   | "more"
+  | "bilibili"
+  | "settings"
+  | "lyrics"
+  | "wave"
+  | "sparkle"
+  | "folder"
   | "logout";
 
 const GLYPHS: Record<IconName, ReactNode> = {
@@ -169,6 +175,47 @@ const GLYPHS: Record<IconName, ReactNode> = {
       <circle cx="5.6" cy="12" r="1.3" fill="currentColor" stroke="none" />
       <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
       <circle cx="18.4" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
+  bilibili: (
+    <>
+      <rect x="3.4" y="7.4" width="17.2" height="12.2" rx="3.2" />
+      <path d="M7.2 4.2 9.9 7M16.8 4.2 14.1 7" />
+      <circle cx="8.9" cy="12.4" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="15.1" cy="12.4" r="1.05" fill="currentColor" stroke="none" />
+      <path d="M9.4 16.1c1.6 1 3.6 1 5.2 0" />
+    </>
+  ),
+  settings: (
+    <>
+      <circle cx="12" cy="12" r="3.1" />
+      <path d="M12 3.4v2.1M12 18.5v2.1M20.6 12h-2.1M5.5 12H3.4" />
+      <path d="M18.1 5.9l-1.5 1.5M7.4 16.6l-1.5 1.5M18.1 18.1l-1.5-1.5M7.4 7.4 5.9 5.9" />
+    </>
+  ),
+  lyrics: (
+    <>
+      <path d="M4.6 6.2h9.2M4.6 10.1h9.2M4.6 14h5.4" />
+      <path d="M14.2 18.6V9.4l5.2-1.2v8.2" />
+      <circle cx="12.6" cy="18.6" r="1.7" />
+      <circle cx="17.8" cy="16.9" r="1.7" />
+    </>
+  ),
+  wave: (
+    <>
+      <path d="M3.6 12h1.6M8 8.4v7.2M12 5.2v13.6M16 9.4v5.2M20.4 12h-1.4" />
+    </>
+  ),
+  sparkle: (
+    <>
+      <path d="M12 3.6l1.7 4.9 4.9 1.7-4.9 1.7L12 16.8l-1.7-4.9L5.4 10.2l4.9-1.7z" />
+      <path d="M18.4 15.2l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" />
+    </>
+  ),
+  folder: (
+    <>
+      <path d="M3.6 7.4a2 2 0 0 1 2-2h3.5l1.9 2.2h7.4a2 2 0 0 1 2 2v7.2a2 2 0 0 1-2 2H5.6a2 2 0 0 1-2-2z" />
+      <path d="M3.6 10.4h16.8" />
     </>
   ),
   logout: (

@@ -5,7 +5,9 @@ export type Route =
   | { name: "library" }
   | { name: "playlists" }
   | { name: "playlist"; id: number }
-  | { name: "themes" };
+  | { name: "bilibili" }
+  | { name: "themes" }
+  | { name: "settings" };
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, "").split("?")[0];
@@ -18,6 +20,10 @@ export function parseRoute(hash: string): Route {
       return { name: "playlists" };
     case "themes":
       return { name: "themes" };
+    case "bilibili":
+      return { name: "bilibili" };
+    case "settings":
+      return { name: "settings" };
     case "playlist": {
       const id = Number(tail);
       return Number.isInteger(id) && id > 0 ? { name: "playlist", id } : { name: "playlists" };
@@ -35,6 +41,10 @@ export function routeHref(route: Route): string {
       return "#/playlists";
     case "themes":
       return "#/themes";
+    case "bilibili":
+      return "#/bilibili";
+    case "settings":
+      return "#/settings";
     case "playlist":
       return `#/playlist/${route.id}`;
     default:

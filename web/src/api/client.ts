@@ -1,5 +1,14 @@
 import type {
   AuthResponse,
+  BiliAccount,
+  BiliFavPage,
+  BiliFolder,
+  BiliQr,
+  BiliQrPoll,
+  BiliVideo,
+  CacheStats,
+  Lyric,
+  LyricSearchItem,
   Playlist,
   PublicUser,
   SearchResponse,
@@ -289,6 +298,77 @@ export const api = {
     return request<{ settings: Settings }>("/api/settings", {
       method: "PATCH",
       json: patch,
+    });
+  },
+
+  biliQr() {
+    return request<BiliQr>("/api/bilibili/qr");
+  },
+
+  biliQrPoll(key: string) {
+    return request<BiliQrPoll>(`/api/bilibili/qr/poll?key=${encodeURIComponent(key)}`);
+  },
+
+  biliAccount() {
+    return request<{ account: BiliAccount | null; expired?: boolean }>("/api/bilibili/account");
+  },
+
+  biliLogout() {
+    return request<{ removed: boolean }>("/api/bilibili/account", { method: "DELETE" });
+  },
+
+  biliFolders() {
+    return request<{ folders: BiliFolder[] }>("/api/bilibili/folders");
+  },
+
+  biliFolderItems(id: number, page = 1, pageSize = 20) {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    return request<BiliFavPage>(`/api/bilibili/folders/${id}/items?${params.toString()}`);
+  },
+
+  biliVideo(bvid: string) {
+    return request<{ video: BiliVideo }>(`/api/bilibili/video/${encodeURIComponent(bvid)}`);
+  },
+
+  biliDownload(bvid: string, cid?: number) {
+    return request<{ track: Track; duplicated: boolean }>("/api/bilibili/download", {
+      json: cid ? { bvid, cid } : { bvid },
+    });
+  },
+
+  getLyric(trackId: number) {
+    return request<{ lyric: Lyric | null }>(`/api/tracks/${trackId}/lyric`);
+  },
+
+  saveLyric(trackId: number, lrc: string, source = "manual") {
+    return request<{ lyric: Lyric }>(`/api/tracks/${trackId}/lyric`, {
+      method: "PUT",
+      json: { lrc, source },
+    });
+  },
+
+  deleteLyric(trackId: number) {
+    return request<{ removed: boolean }>(`/api/tracks/${trackId}/lyric`, { method: "DELETE" });
+  },
+
+  searchLyrics(query: string, artist = "", duration = 0) {
+    const params = new URLSearchParams({ q: query });
+    if (artist) params.set("artist", artist);
+    if (duration > 0) params.set("duration", String(Math.round(duration)));
+    return request<{ results: LyricSearchItem[] }>(`/api/lyrics/search?${params.toString()}`);
+  },
+
+  generateLyric(trackId: number, input: { duration?: number; hint?: string; language?: string } = {}) {
+    return request<{ lyric: Lyric }>(`/api/tracks/${trackId}/lyric/ai`, { json: input });
+  },
+
+  getCache() {
+    return request<{ cache: CacheStats }>("/api/cache");
+  },
+
+  clearCache(target: "covers" | "orphans" | "all") {
+    return request<{ removed: number; cache: CacheStats }>("/api/cache/clear", {
+      json: { target },
     });
   },
 };

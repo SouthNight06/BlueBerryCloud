@@ -15,6 +15,7 @@ const NAV: NavItem[] = [
   { route: { name: "discover" }, label: "发现", icon: "search" },
   { route: { name: "library" }, label: "音乐库", icon: "disc" },
   { route: { name: "playlists" }, label: "歌单", icon: "list" },
+  { route: { name: "bilibili" }, label: "哔哩哔哩", icon: "bilibili" },
   { route: { name: "themes" }, label: "外观", icon: "swatch" },
 ];
 
@@ -89,6 +90,15 @@ export function Sidebar({ route }: { route: Route }) {
           <strong>{user.username}</strong>
           <span>{syncedAt ? `已同步 ${formatDate(syncedAt)}` : "云端存储"}</span>
         </span>
+        <a
+          className="ibtn"
+          href={routeHref({ name: "settings" })}
+          aria-label="设置"
+          title="设置"
+          data-on={route.name === "settings" ? "true" : "false"}
+        >
+          <Icon name="settings" size={16} />
+        </a>
         <button type="button" className="ibtn" onClick={logout} aria-label="退出登录" title="退出登录">
           <Icon name="logout" size={16} />
         </button>

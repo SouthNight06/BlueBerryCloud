@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { formatTime, trackSeed } from "../lib/format";
 import { usePlayer } from "../state/PlayerStore";
+import { useUi } from "../state/UiStore";
 import { Artwork } from "./Artwork";
 import { Icon } from "./Icon";
 
@@ -23,6 +24,7 @@ export function PlayerBar() {
     toggleShuffle,
     cycleRepeat,
   } = usePlayer();
+  const { desktopLyrics, lyricsPanel, toggleDesktopLyrics, openLyrics } = useUi();
 
   const percent = duration > 0 ? Math.min(100, (progress / duration) * 100) : 0;
   const level = muted ? 0 : volume;
@@ -120,6 +122,28 @@ export function PlayerBar() {
         </div>
 
         <div className="player__aux">
+          <button
+            type="button"
+            className="ibtn"
+            data-on={lyricsPanel ? "true" : "false"}
+            onClick={openLyrics}
+            disabled={!current}
+            aria-label="歌词"
+            title="歌词"
+          >
+            <Icon name="lyrics" size={16} />
+          </button>
+          <button
+            type="button"
+            className="ibtn"
+            data-on={desktopLyrics ? "true" : "false"}
+            onClick={toggleDesktopLyrics}
+            disabled={!current}
+            aria-label="桌面歌词"
+            title={desktopLyrics ? "关闭桌面歌词" : "打开桌面歌词"}
+          >
+            <Icon name="wave" size={16} />
+          </button>
           <button
             type="button"
             className="ibtn"

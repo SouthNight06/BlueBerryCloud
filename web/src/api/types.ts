@@ -96,3 +96,97 @@ export type AuthResponse = {
   token: string;
   user: PublicUser;
 };
+
+export type BiliAccount = {
+  mid: string;
+  uname: string;
+  face: string | null;
+  vip: boolean;
+  updatedAt: string;
+};
+
+export type BiliQr = {
+  key: string;
+  url: string;
+  svg: string;
+};
+
+export type BiliQrState = "waiting" | "scanned" | "expired" | "ok" | "unknown";
+
+export type BiliQrPoll = {
+  state: BiliQrState;
+  code: number;
+  message: string;
+  account: BiliAccount | null;
+};
+
+export type BiliFolder = {
+  id: number;
+  title: string;
+  count: number;
+  collected: boolean;
+  cover: string | null;
+};
+
+export type BiliFavItem = {
+  bvid: string;
+  title: string;
+  cover: string | null;
+  author: string;
+  duration: number;
+  play: number | null;
+};
+
+export type BiliFavPage = {
+  title: string;
+  total: number;
+  hasMore: boolean;
+  items: BiliFavItem[];
+  page: number;
+  pageSize: number;
+};
+
+export type BiliPage = {
+  cid: number;
+  title: string;
+  page: number;
+  duration: number;
+};
+
+export type BiliVideo = {
+  bvid: string;
+  title: string;
+  cover: string | null;
+  author: string;
+  duration: number;
+  pages: BiliPage[];
+};
+
+export type Lyric = {
+  trackId: number;
+  lrc: string;
+  source: string;
+  updatedAt: string;
+};
+
+export type LyricSearchItem = {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  duration: number | null;
+  synced: boolean;
+  lrc: string;
+  provider: string;
+};
+
+export type CacheBucket = {
+  files: number;
+  bytes: number;
+};
+
+export type CacheStats = {
+  covers: CacheBucket;
+  audio: CacheBucket;
+  orphans: CacheBucket;
+};

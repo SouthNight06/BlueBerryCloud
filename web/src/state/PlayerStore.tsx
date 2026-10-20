@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { withToken } from "../api/client";
 import type { Track } from "../api/types";
+import { useApp } from "./AppStore";
 import { useToast } from "./ToastStore";
 
 export type RepeatMode = "off" | "all" | "one";
@@ -41,6 +42,9 @@ const PlayerContext = createContext<PlayerValue | null>(null);
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { push } = useToast();
+  const { settings } = useApp();
+  const balance = Boolean(settings?.preferences?.volumeBalance);
+  const djMode = Boolean(settings?.preferences?.djMode);
 
   const [queue, setQueue] = useState<Track[]>([]);
   const [index, setIndex] = useState(-1);
@@ -53,6 +57,87 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [repeat, setRepeat] = useState<RepeatMode>("off");
 
   const current = index >= 0 ? (queue[index] ?? null) : null;
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const balanceTimer = useRef(0);
+  const smoothRef = useRef(1);
+  const levelRef = useRef({ volume, muted });
+
+  useEffect(() => {
+    levelRef.current = { volume, muted };
+  }, [volume, muted]);
+
+  const ensureGraph = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const existing = audioCtxRef.current;
+    if (existing) {
+      if (existing.state === "suspended") void existing.resume();
+      return;
+    }
+    const Ctor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    try {
+      const ctx = new Ctor();
+      const source = ctx.createMediaElementSource(audio);
+      const gain = ctx.createGain();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.4;
+      source.connect(gain);
+      gain.connect(analyser);
+      analyser.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      gainRef.current = gain;
+      analyserRef.current = analyser;
+      if (ctx.state === "suspended") void ctx.resume();
+    } catch {
+      audioCtxRef.current = null;
+      gainRef.current = null;
+      analyserRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const gain = gainRef.current;
+    if (!gain || balance) return;
+    smoothRef.current = 1;
+    gain.gain.setTargetAtTime(1, gain.context.currentTime, 0.1);
+  }, [balance]);
+
+  useEffect(() => {
+    if (!balance || !playing) return;
+    ensureGraph();
+    const analyser = analyserRef.current;
+    const gain = gainRef.current;
+    if (!analyser || !gain) return;
+    const buffer = new Float32Array(analyser.fftSize);
+    balanceTimer.current = window.setInterval(() => {
+      analyser.getFloatTimeDomainData(buffer);
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i += 1) sum += buffer[i] * buffer[i];
+      const rms = Math.sqrt(sum / buffer.length);
+      const level = levelRef.current;
+      if (level.muted || level.volume <= 0.01) {
+        smoothRef.current = 1;
+        gain.gain.setTargetAtTime(1, gain.context.currentTime, 0.15);
+        return;
+      }
+      if (rms < 0.003) return;
+      const target = 0.1 * (level.volume / 0.85);
+      const desired = Math.min(1.9, Math.max(0.55, target / rms));
+      smoothRef.current = smoothRef.current * 0.82 + desired * 0.18;
+      gain.gain.setTargetAtTime(smoothRef.current, gain.context.currentTime, 0.12);
+    }, 120);
+    return () => {
+      window.clearInterval(balanceTimer.current);
+      balanceTimer.current = 0;
+    };
+  }, [balance, playing, ensureGraph]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -69,14 +154,77 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [current]);
 
   useEffect(() => {
+    const root = document.documentElement;
+    if (!djMode) {
+      delete root.dataset.dj;
+      root.style.removeProperty("--dj-energy");
+      root.style.removeProperty("--dj-beat");
+      return;
+    }
+    root.dataset.dj = playing ? "on" : "idle";
+  }, [djMode, playing]);
+
+  useEffect(
+    () => () => {
+      const root = document.documentElement;
+      delete root.dataset.dj;
+      root.style.removeProperty("--dj-energy");
+      root.style.removeProperty("--dj-beat");
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!djMode || !playing) return;
+    ensureGraph();
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+    const root = document.documentElement;
+    const time = new Float32Array(analyser.fftSize);
+    const freq = new Uint8Array(analyser.frequencyBinCount);
+    let energy = 0;
+    let beat = 0;
+    let bassFloor = 0;
+    let last = 0;
+    let frame = 0;
+    const tick = (now: number) => {
+      frame = window.requestAnimationFrame(tick);
+      if (now - last < 32) return;
+      last = now;
+      analyser.getFloatTimeDomainData(time);
+      let sum = 0;
+      for (let i = 0; i < time.length; i += 1) sum += time[i] * time[i];
+      const rms = Math.sqrt(sum / time.length);
+      analyser.getByteFrequencyData(freq);
+      let bass = 0;
+      for (let i = 1; i < 12; i += 1) bass += freq[i];
+      bass = bass / 11 / 255;
+      energy = energy * 0.8 + Math.min(1, rms / 0.14) * 0.2;
+      bassFloor = bassFloor * 0.92 + bass * 0.08;
+      if (bass > 0.34 && bass > bassFloor * 1.2 && beat < 0.32) beat = 1;
+      beat *= 0.88;
+      if (beat < 0.012) beat = 0;
+      root.style.setProperty("--dj-energy", energy.toFixed(3));
+      root.style.setProperty("--dj-beat", beat.toFixed(3));
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      root.style.setProperty("--dj-energy", "0");
+      root.style.setProperty("--dj-beat", "0");
+    };
+  }, [djMode, playing, ensureGraph]);
+
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     if (playing) {
+      if (balance || djMode) ensureGraph();
       void audio.play().catch(() => setPlaying(false));
     } else {
       audio.pause();
     }
-  }, [playing, current]);
+  }, [playing, current, balance, djMode, ensureGraph]);
 
   useEffect(() => {
     const audio = audioRef.current;

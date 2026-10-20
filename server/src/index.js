@@ -2,10 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import express from "express";
 import multer from "multer";
-import { CORS_ORIGINS, HOST, MEDIA_DIR, PORT, WEB_DIST } from "./config.js";
+import { CORS_ORIGINS, COVER_CACHE_DIR, HOST, MEDIA_DIR, PORT, WEB_DIST } from "./config.js";
 import { HttpError } from "./http.js";
 import authRouter from "./routes/auth.js";
+import bilibiliRouter from "./routes/bilibili.js";
+import cacheRouter from "./routes/cache.js";
 import catalogRouter from "./routes/catalog.js";
+import lyricsRouter from "./routes/lyrics.js";
 import playlistRouter from "./routes/playlists.js";
 import syncRouter from "./routes/sync.js";
 import themeRouter from "./routes/themes.js";
@@ -43,6 +46,9 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/playlists", playlistRouter);
+app.use("/api", bilibiliRouter);
+app.use("/api", lyricsRouter);
+app.use("/api", cacheRouter);
 app.use("/api", catalogRouter);
 app.use("/api", themeRouter);
 app.use("/api", syncRouter);
@@ -52,6 +58,8 @@ app.use("/api", (_req, res) => {
 });
 
 const indexHtml = path.join(WEB_DIST, "index.html");
+
+app.use("/covers", express.static(COVER_CACHE_DIR, { index: false, maxAge: "7d" }));
 
 if (fs.existsSync(indexHtml)) {
   app.use(express.static(WEB_DIST, { index: false, maxAge: "1h" }));
