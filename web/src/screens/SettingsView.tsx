@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { api } from "../api/client";
 import type { BiliAccount, CacheStats } from "../api/types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
 import { describeError, formatBytes, formatDate } from "../lib/format";
 import { useApp } from "../state/AppStore";
+import {
+  DJ_STRENGTH_MAX,
+  DJ_STRENGTH_MIN,
+  normalizeDjStrength,
+} from "../state/PlayerStore";
 import { useToast } from "../state/ToastStore";
 import { useUi } from "../state/UiStore";
 
-const VERSION = "1.01";
+const VERSION = "1.0.2";
 
 const CREDITS = [
   {
@@ -63,6 +69,12 @@ export function SettingsView() {
   const preferences = settings?.preferences ?? {};
   const balance = Boolean(preferences.volumeBalance);
   const djMode = Boolean(preferences.djMode);
+  const djStrength = normalizeDjStrength(preferences.djStrength);
+  const [strengthDraft, setStrengthDraft] = useState(djStrength);
+
+  useEffect(() => {
+    setStrengthDraft(djStrength);
+  }, [djStrength]);
 
   const loadBili = useCallback(async () => {
     setBiliBusy(true);
@@ -115,6 +127,24 @@ export function SettingsView() {
     });
     if (ok) push(next ? "已开启 DJ 模式" : "已关闭 DJ 模式");
   };
+
+  const previewStrength = (value: number) => {
+    setStrengthDraft(value);
+    if (djMode) {
+      document.documentElement.style.setProperty("--dj-strength", value.toFixed(2));
+    }
+  };
+
+  const commitStrength = async () => {
+    if (Math.abs(strengthDraft - djStrength) < 0.05) return;
+    const ok = await attempt(async () => {
+      await updatePreferences({ djStrength: strengthDraft });
+      return true;
+    });
+    if (ok) push(`DJ 强度已设为 ${strengthDraft.toFixed(1)}×`);
+  };
+
+  const strengthFill = ((strengthDraft - DJ_STRENGTH_MIN) / (DJ_STRENGTH_MAX - DJ_STRENGTH_MIN)) * 100;
 
   const clearCache = async (target: "covers" | "orphans" | "all") => {
     if (clearing) return;
@@ -300,6 +330,34 @@ export function SettingsView() {
               >
                 <span className="switch__knob" />
               </button>
+            </div>
+          </div>
+          <div className="setrow">
+            <div className="setrow__main">
+              <div className="setrow__title">
+                DJ 强度
+                <span className="num">{strengthDraft.toFixed(1)}×</span>
+              </div>
+              <div className="setrow__desc">
+                控制字体与封面的上下弹跳幅度。往右拖动更明显，往左更含蓄；暂停时依旧回到静止。
+              </div>
+              <div className="setrow__slider">
+                <input
+                  className="range"
+                  type="range"
+                  min={DJ_STRENGTH_MIN}
+                  max={DJ_STRENGTH_MAX}
+                  step={0.1}
+                  value={strengthDraft}
+                  disabled={!djMode}
+                  aria-label="DJ 强度"
+                  style={{ "--fill": `${strengthFill}%` } as CSSProperties}
+                  onChange={(event) => previewStrength(Number(event.currentTarget.value))}
+                  onPointerUp={() => void commitStrength()}
+                  onKeyUp={() => void commitStrength()}
+                  onBlur={() => void commitStrength()}
+                />
+              </div>
             </div>
           </div>
         </div>

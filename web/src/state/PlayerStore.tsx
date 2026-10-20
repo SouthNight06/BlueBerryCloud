@@ -15,6 +15,16 @@ import { useToast } from "./ToastStore";
 
 export type RepeatMode = "off" | "all" | "one";
 
+export const DJ_STRENGTH_MIN = 0.4;
+export const DJ_STRENGTH_MAX = 2.4;
+export const DJ_STRENGTH_DEFAULT = 1.6;
+
+export function normalizeDjStrength(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return DJ_STRENGTH_DEFAULT;
+  return Math.min(DJ_STRENGTH_MAX, Math.max(DJ_STRENGTH_MIN, numeric));
+}
+
 type PlayerValue = {
   current: Track | null;
   queue: Track[];
@@ -45,6 +55,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const { settings } = useApp();
   const balance = Boolean(settings?.preferences?.volumeBalance);
   const djMode = Boolean(settings?.preferences?.djMode);
+  const djStrength = normalizeDjStrength(settings?.preferences?.djStrength);
 
   const [queue, setQueue] = useState<Track[]>([]);
   const [index, setIndex] = useState(-1);
@@ -87,7 +98,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const gain = ctx.createGain();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.4;
+      analyser.smoothingTimeConstant = 0.25;
       source.connect(gain);
       gain.connect(analyser);
       analyser.connect(ctx.destination);
@@ -159,10 +170,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       delete root.dataset.dj;
       root.style.removeProperty("--dj-energy");
       root.style.removeProperty("--dj-beat");
+      root.style.removeProperty("--dj-strength");
       return;
     }
+    root.style.setProperty("--dj-strength", djStrength.toFixed(2));
     root.dataset.dj = playing ? "on" : "idle";
-  }, [djMode, playing]);
+  }, [djMode, playing, djStrength]);
 
   useEffect(
     () => () => {
@@ -170,6 +183,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       delete root.dataset.dj;
       root.style.removeProperty("--dj-energy");
       root.style.removeProperty("--dj-beat");
+      root.style.removeProperty("--dj-strength");
     },
     [],
   );
@@ -199,11 +213,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       let bass = 0;
       for (let i = 1; i < 12; i += 1) bass += freq[i];
       bass = bass / 11 / 255;
-      energy = energy * 0.8 + Math.min(1, rms / 0.14) * 0.2;
-      bassFloor = bassFloor * 0.92 + bass * 0.08;
-      if (bass > 0.34 && bass > bassFloor * 1.2 && beat < 0.32) beat = 1;
-      beat *= 0.88;
-      if (beat < 0.012) beat = 0;
+      energy = energy * 0.76 + Math.min(1, rms / 0.12) * 0.24;
+      bassFloor = bassFloor * 0.9 + bass * 0.1;
+      if (bass > 0.3 && bass > bassFloor * 1.14 && beat < 0.45) beat = 1;
+      beat *= 0.86;
+      if (beat < 0.01) beat = 0;
       root.style.setProperty("--dj-energy", energy.toFixed(3));
       root.style.setProperty("--dj-beat", beat.toFixed(3));
     };
