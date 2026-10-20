@@ -111,13 +111,39 @@ jobs:
           node -v
 
           log "3/8 同步代码"
-          if [ -d "$APPDIR/.git" ]; then
-            $SUDO git -C "$APPDIR" remote set-url origin "$REPO"
-            $SUDO git -C "$APPDIR" fetch --depth=1 origin main
-            $SUDO git -C "$APPDIR" reset --hard origin/main
-          else
-            $SUDO git clone --depth=1 "$REPO" "$APPDIR"
+          sync_git() {
+            if [ -d "$APPDIR/.git" ]; then
+              $SUDO git -C "$APPDIR" remote set-url origin "$REPO"
+              $SUDO git -C "$APPDIR" -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 fetch --depth=1 origin main
+              $SUDO git -C "$APPDIR" reset --hard origin/main
+            else
+              $SUDO git -c http.version=HTTP/1.1 clone --depth=1 "$REPO" "$APPDIR"
+            fi
+          }
+          sync_tar() {
+            TMPD="$(mktemp -d)"
+            curl -fsSL --retry 4 --retry-all-errors --retry-delay 3 --connect-timeout 20 --max-time 300 \
+              "https://codeload.github.com/SouthNight06/BlueBerryCloud/tar.gz/refs/heads/main" -o "$TMPD/src.tar.gz"
+            tar -xzf "$TMPD/src.tar.gz" -C "$TMPD"
+            $SUDO mkdir -p "$APPDIR"
+            if command -v rsync >/dev/null 2>&1; then
+              $SUDO rsync -a --delete --exclude .git "$TMPD"/BlueBerryCloud-main/ "$APPDIR"/
+            else
+              $SUDO cp -a "$TMPD"/BlueBerryCloud-main/. "$APPDIR"/
+            fi
+            rm -rf "$TMPD"
+          }
+          SYNC_OK=0
+          for i in 1 2 3; do
+            if sync_git; then SYNC_OK=1; break; fi
+            echo "  git 同步失败（第 $i 次），5 秒后重试"
+            sleep 5
+          done
+          if [ "$SYNC_OK" != "1" ]; then
+            echo "  git 直连持续失败，回退到 codeload tarball"
+            sync_tar
           fi
+          $SUDO git -C "$APPDIR" rev-parse --short HEAD 2>/dev/null || echo "  （tar 模式下无 git 元数据）"
 
           log "4/8 安装服务端依赖"
           cd "$APPDIR/server"
