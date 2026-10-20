@@ -9,6 +9,7 @@ import { ThemesView } from "../screens/ThemesView";
 import { usePlayer } from "../state/PlayerStore";
 import { useUi } from "../state/UiStore";
 import { DesktopLyrics } from "./DesktopLyrics";
+import { DjPet } from "./DjPet";
 import { LyricsModal } from "./LyricsModal";
 import { PlayerBar } from "./PlayerBar";
 import { Sidebar } from "./Sidebar";
@@ -31,6 +32,7 @@ export function AppShell() {
         {route.name === "settings" ? <SettingsView /> : null}
       </main>
       <PlayerBar />
+      <DjPet />
       <DesktopLyrics />
       {lyricsPanel && current ? <LyricsModal track={current} onClose={closeLyrics} /> : null}
     </div>

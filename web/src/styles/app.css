@@ -1824,6 +1824,45 @@
     scale 90ms var(--dj-spring);
 }
 
+/* ── dj pet ────────────────────────────────────────────────────────── */
+
+.djpet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--player-h);
+  z-index: 88;
+  height: 0;
+  pointer-events: none;
+  animation: djpet-in 0.36s var(--ease) both;
+}
+
+.djpet__art {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: auto;
+  height: clamp(64px, 14vw, 96px);
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 8px 14px rgba(12, 16, 28, 0.34));
+  user-select: none;
+  -webkit-user-drag: none;
+  will-change: transform;
+}
+
+@keyframes djpet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .djpet {
+    animation: none;
+  }
+}
+
 /* ── responsive ────────────────────────────────────────────────────── */
 
 @media (max-width: 960px) {

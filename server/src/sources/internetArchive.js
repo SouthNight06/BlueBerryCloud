@@ -13,7 +13,7 @@ const AUDIO_FORMAT_PRIORITY = [
 async function fetchJson(url, signal) {
   const res = await fetch(url, {
     signal,
-    headers: { "User-Agent": "CloudMusic/1.0.2 (personal music player)" },
+    headers: { "User-Agent": "CloudMusic/1.0.3 (personal music player)" },
   });
   if (!res.ok) throw new Error(`archive.org ${res.status}`);
   return res.json();
