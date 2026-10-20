@@ -21,7 +21,16 @@ import type {
 
 const TOKEN_KEY = "xiaoyun.token";
 const API_BASE_KEY = "xiaoyun.apiBase";
+const RESOLVED_BASE_KEY = "xiaoyun.apiBaseResolved";
 const ENV_BASE = (import.meta.env.VITE_API_BASE ?? "").trim();
+const DEFAULT_BASE = "https://music.lichenlc.cn";
+const CONFIG_URLS = [
+  (import.meta.env.VITE_CONFIG_URL ?? "").trim(),
+  "https://cdn.jsdelivr.net/gh/SouthNight06/BlueBerryCloud@main/client-config.json",
+  "https://fastly.jsdelivr.net/gh/SouthNight06/BlueBerryCloud@main/client-config.json",
+].filter(Boolean);
+
+const IP_HOST = /^\d{1,3}(\.\d{1,3}){3}$/;
 
 export function normalizeApiBase(value: string): string {
   const trimmed = value.trim().replace(/\/+$/, "");
@@ -29,12 +38,37 @@ export function normalizeApiBase(value: string): string {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
 }
 
-function readStoredBase(): string {
+function readRaw(key: string): string | null {
   try {
-    const stored = window.localStorage.getItem(API_BASE_KEY);
-    if (stored !== null) return normalizeApiBase(stored);
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeRaw(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable — keeps the in-memory value */
+  }
+}
+
+function dropRaw(key: string) {
+  try {
+    window.localStorage.removeItem(key);
   } catch {
     /* storage unavailable */
+  }
+}
+
+function readStoredBase(): string {
+  const override = readRaw(API_BASE_KEY);
+  if (override !== null) return normalizeApiBase(override);
+  if (isNativeApp()) {
+    const resolved = readRaw(RESOLVED_BASE_KEY);
+    if (resolved) return normalizeApiBase(resolved);
+    return normalizeApiBase(ENV_BASE) || DEFAULT_BASE;
   }
   return normalizeApiBase(ENV_BASE);
 }
@@ -47,10 +81,24 @@ export function getApiBase(): string {
 
 export function setApiBase(value: string) {
   apiBase = normalizeApiBase(value);
+  writeRaw(API_BASE_KEY, apiBase);
+}
+
+export function resetApiBase(): string {
+  dropRaw(API_BASE_KEY);
+  dropRaw(RESOLVED_BASE_KEY);
+  apiBase = readStoredBase();
+  return apiBase;
+}
+
+export function describeApiBase(base = apiBase): string {
+  if (!base) return "尚未设置服务器地址";
   try {
-    window.localStorage.setItem(API_BASE_KEY, apiBase);
+    const url = new URL(base);
+    if (IP_HOST.test(url.hostname)) return "自定义服务器（地址已隐藏）";
+    return `云端 · ${url.host}`;
   } catch {
-    /* storage unavailable — keeps the in-memory value */
+    return "自定义服务器";
   }
 }
 
@@ -71,16 +119,58 @@ function resolveUrl(path: string): string {
   return apiBase ? `${apiBase}${path}` : path;
 }
 
-export async function checkServer(value: string): Promise<boolean> {
+function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+    window.clearTimeout(timer),
+  );
+}
+
+export type ProbeResult = "ok" | "foreign" | "unreachable";
+
+export async function probeServer(value: string, timeoutMs = 6000): Promise<ProbeResult> {
   const base = normalizeApiBase(value);
+  if (!base) return "unreachable";
   try {
-    const response = await fetch(`${base}/api/health`, { method: "GET" });
-    if (!response.ok) return false;
-    const payload = (await response.json()) as { name?: string };
-    return payload?.name === "cloudmusic";
+    const response = await fetchWithTimeout(`${base}/api/health`, { method: "GET" }, timeoutMs);
+    if (!response.ok) return "foreign";
+    const payload = (await response.json()) as Record<string, unknown> | null;
+    if (!payload || payload.ok !== true) return "foreign";
+    if (typeof payload.name === "string" && payload.name) {
+      return payload.name === "cloudmusic" || payload.name === "aurora-music" ? "ok" : "foreign";
+    }
+    const marked = typeof payload.authMode === "string" || "originalConnected" in payload;
+    return marked ? "ok" : "foreign";
   } catch {
-    return false;
+    return "unreachable";
   }
+}
+
+export async function checkServer(value: string): Promise<boolean> {
+  return (await probeServer(value)) === "ok";
+}
+
+export async function syncApiBase(): Promise<string> {
+  if (!isNativeApp() || readRaw(API_BASE_KEY) !== null) return apiBase;
+  for (const url of CONFIG_URLS) {
+    try {
+      const response = await fetchWithTimeout(url, { cache: "no-store" }, 2200);
+      if (!response.ok) continue;
+      const payload = (await response.json()) as { apiBase?: unknown };
+      const candidate = normalizeApiBase(
+        typeof payload?.apiBase === "string" ? payload.apiBase : "",
+      );
+      if (!candidate || candidate === apiBase) continue;
+      if ((await probeServer(candidate, 4000)) !== "ok") continue;
+      writeRaw(RESOLVED_BASE_KEY, candidate);
+      apiBase = candidate;
+      return apiBase;
+    } catch {
+      /* 换下一个镜像 */
+    }
+  }
+  return apiBase;
 }
 
 export class ApiError extends Error {

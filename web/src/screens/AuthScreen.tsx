@@ -1,6 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { api, checkServer, getApiBase, isNativeApp, setApiBase } from "../api/client";
+import { api, describeApiBase, getApiBase, isNativeApp, probeServer, resetApiBase, setApiBase } from "../api/client";
 import type { AuthResponse } from "../api/types";
 import { Icon } from "../components/Icon";
 import { describeError } from "../lib/format";
@@ -32,24 +32,52 @@ export function AuthScreen({ onAuthed }: { onAuthed: (auth: AuthResponse) => voi
     if (serverBusy) return;
     const candidate = serverInput.trim();
     if (!candidate) {
-      setApiBase("");
-      setBase("");
-      setServerNote("已恢复为随应用内置的服务器");
+      const restored = resetApiBase();
+      setBase(restored);
+      setServerInput(restored);
+      setServerNote(describeApiBase(restored));
       return;
     }
     setServerBusy(true);
     setServerNote("正在连接…");
-    const reachable = await checkServer(candidate);
+    const reachable = await probeServer(candidate);
     setServerBusy(false);
-    if (!reachable) {
+    if (reachable === "unreachable") {
       setServerNote("连不上这台服务器，检查地址和网络后再试");
+      return;
+    }
+    if (reachable === "foreign") {
+      setServerNote("这个地址能打开，但不像是小云畅听服务器");
       return;
     }
     setApiBase(candidate);
     setBase(getApiBase());
-    setServerNote("已连接，可以登录了");
+    setServerInput(getApiBase());
+    setServerNote("已切换到这台服务器");
     setServerOpen(false);
   }, [serverBusy, serverInput]);
+
+  const restoreServer = useCallback(() => {
+    const restored = resetApiBase();
+    setBase(restored);
+    setServerInput(restored);
+    setServerNote(describeApiBase(restored));
+    setServerOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!native || !base) return;
+    let alive = true;
+    void probeServer(base, 4500).then((state) => {
+      if (!alive || state === "ok") return;
+      setServerNote(
+        state === "foreign" ? "这个地址不像是小云畅听服务器" : "暂时连不上服务器，检查网络后重试",
+      );
+    });
+    return () => {
+      alive = false;
+    };
+  }, [base, native]);
 
   const switchMode = useCallback(() => {
     setMode((value) => (value === "login" ? "register" : "login"));
@@ -193,28 +221,42 @@ export function AuthScreen({ onAuthed }: { onAuthed: (auth: AuthResponse) => voi
               onClick={() => setServerOpen((value) => !value)}
             >
               <Icon name="cloud" size={13} />
-              {base ? `服务器 · ${base}` : "尚未设置服务器地址"}
+              {describeApiBase(base)}
+              <span className="auth__servermore">{serverOpen ? "收起" : "高级"}</span>
             </button>
 
             {serverOpen ? (
-              <div className="auth__serverbox">
-                <input
-                  value={serverInput}
-                  onChange={(event) => setServerInput(event.target.value)}
-                  placeholder="http://192.168.1.10:3001"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  inputMode="url"
-                />
-                <button
-                  type="button"
-                  className="btn btn--sm"
-                  onClick={saveServer}
-                  disabled={serverBusy}
-                >
-                  {serverBusy ? "测试中…" : "测试并保存"}
-                </button>
-              </div>
+              <>
+                <div className="auth__serverbox">
+                  <input
+                    value={serverInput}
+                    onChange={(event) => setServerInput(event.target.value)}
+                    placeholder="https://your-domain.com"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    inputMode="url"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    onClick={saveServer}
+                    disabled={serverBusy}
+                  >
+                    {serverBusy ? "测试中…" : "测试并保存"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    onClick={restoreServer}
+                    disabled={serverBusy}
+                  >
+                    恢复默认
+                  </button>
+                </div>
+                <p className="auth__servernote">
+                  平时不用改这里：填了就会覆盖随应用内置的地址，只给自己调试或局域网部署用。
+                </p>
+              </>
             ) : null}
 
             {serverNote ? <p className="auth__servernote">{serverNote}</p> : null}

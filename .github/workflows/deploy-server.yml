@@ -1,0 +1,243 @@
+name: deploy-server
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 对外域名
+        required: false
+        default: music.lichenlc.cn
+      port:
+        description: 服务端本地端口
+        required: false
+        default: "3001"
+      app_dir:
+        description: 服务器上的部署目录
+        required: false
+        default: /opt/cloudmusic
+      skip_certbot:
+        description: 跳过证书签发（填 true 可跳过）
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check credentials
+        env:
+          HOST: ${{ secrets.VPS_HOST || secrets.SERVER_HOST || secrets.SSH_HOST || secrets.DEPLOY_HOST }}
+          USER_NAME: ${{ secrets.VPS_USER || secrets.SERVER_USER || secrets.SSH_USER || secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.VPS_SSH_KEY || secrets.SSH_PRIVATE_KEY || secrets.SERVER_SSH_KEY || secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${HOST}" ] || missing="$missing VPS_HOST"
+          [ -n "${USER_NAME}" ] || missing="$missing VPS_USER"
+          [ -n "${KEY}" ] || missing="$missing VPS_SSH_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::缺少仓库 Secrets:$missing"
+            echo "请在 Settings → Secrets and variables → Actions 里添加："
+            echo "  VPS_HOST     服务器地址（IP 或域名）"
+            echo "  VPS_USER     登录用户，需能 sudo（如 root / ubuntu）"
+            echo "  VPS_SSH_KEY  该用户对应的私钥全文（-----BEGIN ... PRIVATE KEY-----）"
+            echo "  VPS_PORT     可选，默认 22"
+            exit 1
+          fi
+          echo "凭据齐备，目标用户 ${USER_NAME}"
+
+      - name: Prepare ssh
+        env:
+          HOST: ${{ secrets.VPS_HOST || secrets.SERVER_HOST || secrets.SSH_HOST || secrets.DEPLOY_HOST }}
+          PORT_SSH: ${{ secrets.VPS_PORT || '22' }}
+          USER_NAME: ${{ secrets.VPS_USER || secrets.SERVER_USER || secrets.SSH_USER || secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.VPS_SSH_KEY || secrets.SSH_PRIVATE_KEY || secrets.SERVER_SSH_KEY || secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$PORT_SSH" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat > ~/.ssh/config <<CFG
+          Host target
+            HostName $HOST
+            Port $PORT_SSH
+            User $USER_NAME
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking accept-new
+            ServerAliveInterval 30
+          CFG
+          ssh -o BatchMode=yes target 'echo ssh-ok && uname -a'
+
+      - name: Write remote script
+        run: |
+          cat > remote-setup.sh <<'REMOTE'
+          set -euo pipefail
+
+          DOMAIN="${DOMAIN:?domain required}"
+          PORT="${PORT:-3001}"
+          APPDIR="${APPDIR:-/opt/cloudmusic}"
+          REPO="https://github.com/SouthNight06/BlueBerryCloud.git"
+          SKIP_CERTBOT="${SKIP_CERTBOT:-false}"
+
+          log() { printf '\n==> %s\n' "$*"; }
+          export DEBIAN_FRONTEND=noninteractive
+
+          SUDO=""
+          if [ "$(id -u)" != "0" ]; then SUDO="sudo -n"; fi
+
+          log "1/8 安装基础软件"
+          $SUDO apt-get update -qq
+          $SUDO apt-get install -y -qq git curl openssl ca-certificates
+
+          log "2/8 检查 Node 版本（需要 >= 22.5）"
+          NODE_OK=0
+          if command -v node >/dev/null 2>&1; then
+            if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=5)?0:1)'; then NODE_OK=1; fi
+          fi
+          if [ "$NODE_OK" != "1" ]; then
+            curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO bash - >/dev/null
+            $SUDO apt-get install -y -qq nodejs
+          fi
+          node -v
+
+          log "3/8 同步代码"
+          if [ -d "$APPDIR/.git" ]; then
+            $SUDO git -C "$APPDIR" remote set-url origin "$REPO"
+            $SUDO git -C "$APPDIR" fetch --depth=1 origin main
+            $SUDO git -C "$APPDIR" reset --hard origin/main
+          else
+            $SUDO git clone --depth=1 "$REPO" "$APPDIR"
+          fi
+
+          log "4/8 安装服务端依赖"
+          cd "$APPDIR/server"
+          $SUDO npm ci --omit=dev --no-audit --no-fund
+
+          log "5/8 生成环境变量"
+          $SUDO install -d -m 700 /etc/cloudmusic
+          if [ ! -s /etc/cloudmusic/env ]; then
+            printf 'JWT_SECRET=%s\n' "$(openssl rand -hex 32)" | $SUDO tee /etc/cloudmusic/env >/dev/null
+            $SUDO chmod 600 /etc/cloudmusic/env
+          fi
+
+          log "6/8 写入 systemd 并启动"
+          NODE_BIN="$(command -v node)"
+          $SUDO tee /etc/systemd/system/cloudmusic.service >/dev/null <<UNIT
+          [Unit]
+          Description=CloudMusic server
+          After=network.target
+
+          [Service]
+          Type=simple
+          WorkingDirectory=$APPDIR/server
+          EnvironmentFile=/etc/cloudmusic/env
+          Environment=NODE_ENV=production
+          Environment=HOST=127.0.0.1
+          Environment=PORT=$PORT
+          ExecStart=$NODE_BIN src/index.js
+          Restart=always
+          RestartSec=3
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          $SUDO systemctl daemon-reload
+          $SUDO systemctl enable cloudmusic >/dev/null 2>&1 || true
+          $SUDO systemctl restart cloudmusic
+          sleep 3
+          $SUDO systemctl is-active cloudmusic
+          curl -fsS "http://127.0.0.1:$PORT/api/health"
+          echo
+
+          log "7/8 配置 nginx 反代"
+          if ! command -v nginx >/dev/null 2>&1; then
+            $SUDO apt-get install -y -qq nginx
+          fi
+          CONF="/etc/nginx/conf.d/cloudmusic-$DOMAIN.conf"
+          $SUDO tee "$CONF" >/dev/null <<CONF2
+          server {
+            listen 80;
+            listen [::]:80;
+            server_name $DOMAIN;
+
+            client_max_body_size 200m;
+
+            location / {
+              proxy_pass http://127.0.0.1:$PORT;
+              proxy_http_version 1.1;
+              proxy_set_header Host \$host;
+              proxy_set_header X-Real-IP \$remote_addr;
+              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$scheme;
+              proxy_set_header Upgrade \$http_upgrade;
+              proxy_set_header Connection "";
+              proxy_read_timeout 300s;
+              proxy_send_timeout 300s;
+            }
+          }
+          CONF2
+          $SUDO nginx -t
+          $SUDO systemctl reload nginx
+          sleep 1
+          LOCAL="$(curl -fsS -H "Host: $DOMAIN" http://127.0.0.1/api/health || true)"
+          echo "本机按 Host 访问：$LOCAL"
+          case "$LOCAL" in
+            *cloudmusic*) : ;;
+            *) echo "::error::nginx 没有把 $DOMAIN 指向本服务（可能被面板或默认站点截走），请检查 nginx -T 里 server_name 的先后顺序"; exit 4 ;;
+          esac
+
+          log "8/8 申请 HTTPS 证书"
+          if [ "$SKIP_CERTBOT" = "true" ]; then
+            echo "已跳过 certbot"
+          else
+            if ! command -v certbot >/dev/null 2>&1; then
+              $SUDO apt-get install -y -qq certbot python3-certbot-nginx
+            fi
+            $SUDO certbot --nginx -d "$DOMAIN" -n --agree-tos -m "admin@$DOMAIN" --redirect --keep-until-expiring \
+              || $SUDO certbot --nginx -d "$DOMAIN" -n --agree-tos --register-unsafely-without-email --redirect --keep-until-expiring \
+              || echo "::warning::证书签发失败，先保留 http，请检查 80 端口是否放行"
+            sleep 1
+            $SUDO nginx -t
+            $SUDO systemctl reload nginx
+          fi
+
+          log "验收"
+          curl -fsS "https://$DOMAIN/api/health" || curl -fsS "http://$DOMAIN/api/health"
+          echo
+          REMOTE
+          echo "远程脚本已生成"
+
+      - name: Upload and run
+        env:
+          DOMAIN: ${{ inputs.domain }}
+          PORT: ${{ inputs.port }}
+          APPDIR: ${{ inputs.app_dir }}
+          SKIP_CERTBOT: ${{ inputs.skip_certbot }}
+        run: |
+          set -euo pipefail
+          scp -q remote-setup.sh target:/tmp/cloudmusic-setup.sh
+          ssh -tt target "DOMAIN='$DOMAIN' PORT='$PORT' APPDIR='$APPDIR' SKIP_CERTBOT='$SKIP_CERTBOT' bash /tmp/cloudmusic-setup.sh"
+
+      - name: Verify from runner
+        env:
+          DOMAIN: ${{ inputs.domain }}
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            BODY="$(curl -fsS --max-time 15 "https://$DOMAIN/api/health" || true)"
+            echo "try $i: $BODY"
+            case "$BODY" in
+              *'"name":"cloudmusic"'*) echo "部署成功"; exit 0 ;;
+            esac
+            sleep 5
+          done
+          echo "::error::https://$DOMAIN/api/health 未返回 cloudmusic"
+          exit 1
