@@ -1,0 +1,20 @@
+{
+  "name": "xiaoyun-changting-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "小云畅听 backend — Express + node:sqlite",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2"
+  }
+}

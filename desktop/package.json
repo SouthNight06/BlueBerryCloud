@@ -1,0 +1,67 @@
+{
+  "name": "xiaoyun-changting-desktop",
+  "productName": "小云畅听",
+  "version": "1.0.0",
+  "private": true,
+  "description": "小云畅听 · 小云屋出品的多端音乐播放器桌面端",
+  "author": "小云屋",
+  "desktopName": "xiaoyun-changting.desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:server": "esbuild ../server/src/index.js --bundle --platform=node --format=cjs --target=node22 --external:node:* --outfile=server-dist/index.cjs",
+    "predist": "npm run build:server",
+    "dist": "electron-builder --publish never",
+    "dist:linux": "npm run build:server && electron-builder --linux --publish never",
+    "dist:win": "npm run build:server && electron-builder --win --publish never",
+    "dist:mac": "npm run build:server && electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.9.2",
+    "electron-builder": "26.15.3",
+    "esbuild": "^0.25.12"
+  },
+  "build": {
+    "appId": "app.xiaoyun.changting",
+    "productName": "小云畅听",
+    "artifactName": "XiaoyunChangting-${version}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "publish": null,
+    "extraResources": [
+      {
+        "from": "server-dist",
+        "to": "server",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../web/dist",
+        "to": "web",
+        "filter": ["**/*"]
+      }
+    ],
+    "linux": {
+      "target": ["AppImage"],
+      "category": "AudioVideo",
+      "icon": "assets/icon.png",
+      "executableName": "xiaoyun-changting",
+      "synopsis": "小云畅听 · 多端音乐播放器",
+      "syncDesktopName": true
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.music",
+      "icon": "assets/icon.png"
+    }
+  }
+}
