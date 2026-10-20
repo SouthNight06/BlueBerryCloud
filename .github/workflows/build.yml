@@ -23,7 +23,7 @@ jobs:
         include:
           - os: ubuntu-latest
             target: linux
-            artifact: XiaoyunChangting-*-linux.AppImage
+            artifact: XiaoyunChangting-*.AppImage
           - os: windows-latest
             target: win
             artifact: XiaoyunChangting-*.exe
