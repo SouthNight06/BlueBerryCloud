@@ -172,7 +172,7 @@ jobs:
           if [ -s /tmp/cloudmusic-web-dist.tgz ]; then
             $SUDO rm -rf "$APPDIR/web/dist"
             $SUDO install -d -m 755 "$APPDIR/web/dist"
-            $SUDO tar -xzf /tmp/cloudmusic-web-dist.tgz -C "$APPDIR/web/dist"
+            $SUDO tar -xzf /tmp/cloudmusic-web-dist.tgz --no-same-owner -C "$APPDIR/web/dist"
             rm -f /tmp/cloudmusic-web-dist.tgz
             if [ ! -f "$APPDIR/web/dist/index.html" ]; then
               echo "::error::前端产物缺少 index.html"
