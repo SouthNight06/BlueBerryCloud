@@ -11,6 +11,7 @@ export type TrackRowData = {
   duration: number | null;
   source: string;
   sourceId: string | null;
+  coverUrl?: string | null;
 };
 
 type TrackRowProps = {
@@ -35,7 +36,7 @@ export function TrackRow({ track, position, active, playing, onPlay, actions }: 
       >
         <span className="row__pos num">{position}</span>
         <span className="row__art">
-          <Artwork seed={trackSeed(track)} size={46} />
+          <Artwork seed={trackSeed(track)} size={46} cover={track.coverUrl ?? null} />
           <span className="row__play">
             <Icon name={active && playing ? "pause" : "play"} size={16} />
           </span>

@@ -37,7 +37,7 @@ export function PlayerBar() {
         <div className="player__now">
           {current ? (
             <>
-              <Artwork seed={trackSeed(current)} size={44} />
+              <Artwork seed={trackSeed(current)} size={44} cover={current.coverUrl} />
               <div className="player__meta">
                 <div className="player__title">{current.title}</div>
                 <div className="player__artist">{current.artist || "未知艺术家"}</div>

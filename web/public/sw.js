@@ -1,8 +1,15 @@
-const VERSION = "xiaoyun-v1";
+const VERSION = "xiaoyun-v2";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 
-const SHELL_FILES = ["/", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png"];
+const SHELL_FILES = [
+  "/",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
+  "/artwork-placeholder.jpg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -27,7 +34,7 @@ self.addEventListener("activate", (event) => {
 
 function isShellAsset(url) {
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/media/")) return false;
-  return /\.(?:js|css|woff2?|png|svg|webmanifest)$/.test(url.pathname);
+  return /\.(?:js|css|woff2?|png|jpe?g|webp|svg|webmanifest)$/.test(url.pathname);
 }
 
 self.addEventListener("fetch", (event) => {
