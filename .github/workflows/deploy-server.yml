@@ -88,6 +88,7 @@ jobs:
           APPDIR="${APPDIR:-/opt/cloudmusic}"
           REPO="https://github.com/SouthNight06/BlueBerryCloud.git"
           SKIP_CERTBOT="${SKIP_CERTBOT:-false}"
+          WANT_SHA="${WANT_SHA:-}"
 
           log() { printf '\n==> %s\n' "$*"; }
           export DEBIAN_FRONTEND=noninteractive
@@ -113,12 +114,13 @@ jobs:
           log "3/8 同步代码"
           sync_git() {
             if [ -d "$APPDIR/.git" ]; then
-              $SUDO git -C "$APPDIR" remote set-url origin "$REPO"
-              $SUDO git -C "$APPDIR" -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 fetch --depth=1 origin main
-              $SUDO git -C "$APPDIR" reset --hard origin/main
+              $SUDO git -C "$APPDIR" remote set-url origin "$REPO" || return 1
+              $SUDO git -C "$APPDIR" -c http.version=HTTP/1.1 fetch --depth=1 origin main || return 1
+              $SUDO git -C "$APPDIR" reset --hard FETCH_HEAD || return 1
             else
-              $SUDO git -c http.version=HTTP/1.1 clone --depth=1 "$REPO" "$APPDIR"
+              $SUDO git -c http.version=HTTP/1.1 clone --depth=1 "$REPO" "$APPDIR" || return 1
             fi
+            return 0
           }
           sync_tar() {
             TMPD="$(mktemp -d)"
@@ -134,16 +136,22 @@ jobs:
             rm -rf "$TMPD"
           }
           SYNC_OK=0
+          SYNC_HEAD=""
           for i in 1 2 3; do
-            if sync_git; then SYNC_OK=1; break; fi
+            if sync_git; then
+              SYNC_HEAD="$($SUDO git -C "$APPDIR" rev-parse HEAD 2>/dev/null || true)"
+              if [ -z "$WANT_SHA" ] || [ "$SYNC_HEAD" = "$WANT_SHA" ]; then SYNC_OK=1; break; fi
+              echo "  同步到 ${SYNC_HEAD:0:7}，期望 ${WANT_SHA:0:7}"
+            fi
             echo "  git 同步失败（第 $i 次），5 秒后重试"
             sleep 5
           done
           if [ "$SYNC_OK" != "1" ]; then
             echo "  git 直连持续失败，回退到 codeload tarball"
             sync_tar
+            SYNC_HEAD="tar(${WANT_SHA:0:7})"
           fi
-          $SUDO git -C "$APPDIR" rev-parse --short HEAD 2>/dev/null || echo "  （tar 模式下无 git 元数据）"
+          echo "  代码版本：$SYNC_HEAD"
 
           log "4/8 安装服务端依赖"
           cd "$APPDIR/server"
@@ -257,20 +265,23 @@ jobs:
           $SUDO "$NGINX_BIN" -t
           $SUDO systemctl reload nginx || $SUDO "$NGINX_BIN" -s reload
           sleep 1
-          LOCAL="$(curl -fsS -H "Host: $DOMAIN" http://127.0.0.1/api/health || true)"
-          echo "本机按 Host 访问：$LOCAL"
-          case "$LOCAL" in
-            *cloudmusic*) : ;;
-            *)
-              echo "::error::nginx 没有把 $DOMAIN 指向本服务（可能被面板或默认站点截走）"
-              if [ "${CREATED:-0}" = "1" ]; then
-                $SUDO rm -f "$CONF"
-                $SUDO "$NGINX_BIN" -t && ($SUDO systemctl reload nginx || $SUDO "$NGINX_BIN" -s reload) || true
-                echo "已回滚新写入的 $CONF"
-              fi
-              exit 4
-              ;;
-          esac
+          HTTPS_BODY="$(curl -k -sS -m 15 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/health" 2>/dev/null || true)"
+          HTTP_INFO="$(curl -sS -m 15 -H "Host: $DOMAIN" -o /dev/null -w '%{http_code} %{redirect_url}' "http://127.0.0.1/api/health" 2>/dev/null || true)"
+          echo "本机 https：${HTTPS_BODY:0:120}"
+          echo "本机 http ：$HTTP_INFO"
+          if printf '%s' "$HTTPS_BODY" | grep -q cloudmusic; then
+            echo "  自测通过：https 直连命中本服务"
+          elif printf '%s' "$HTTP_INFO" | grep -q "$DOMAIN"; then
+            echo "  自测通过：http 已跳转到 https"
+          else
+            echo "::error::nginx 没有把 $DOMAIN 指向本服务（可能被面板或默认站点截走）"
+            if [ "${CREATED:-0}" = "1" ]; then
+              $SUDO rm -f "$CONF"
+              $SUDO "$NGINX_BIN" -t && ($SUDO systemctl reload nginx || $SUDO "$NGINX_BIN" -s reload) || true
+              echo "已回滚新写入的 $CONF"
+            fi
+            exit 4
+          fi
 
           log "8/8 申请 HTTPS 证书"
           CRT=""
@@ -354,7 +365,7 @@ jobs:
         run: |
           set -euo pipefail
           scp -q remote-setup.sh target:/tmp/cloudmusic-setup.sh
-          ssh -tt target "DOMAIN='$DOMAIN' PORT='$PORT' APPDIR='$APPDIR' SKIP_CERTBOT='$SKIP_CERTBOT' bash /tmp/cloudmusic-setup.sh"
+          ssh -tt target "DOMAIN='$DOMAIN' PORT='$PORT' APPDIR='$APPDIR' SKIP_CERTBOT='$SKIP_CERTBOT' WANT_SHA='$GITHUB_SHA' bash /tmp/cloudmusic-setup.sh"
 
       - name: Verify from runner
         env:
