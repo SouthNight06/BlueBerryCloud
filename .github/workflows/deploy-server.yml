@@ -123,12 +123,24 @@ jobs:
           cd "$APPDIR/server"
           $SUDO npm ci --omit=dev --no-audit --no-fund
 
-          log "5/8 生成环境变量"
+          log "5/8 生成环境变量与数据目录"
+          $SUDO install -d -m 750 /var/lib/cloudmusic
           $SUDO install -d -m 700 /etc/cloudmusic
-          if [ ! -s /etc/cloudmusic/env ]; then
-            printf 'JWT_SECRET=%s\n' "$(openssl rand -hex 32)" | $SUDO tee /etc/cloudmusic/env >/dev/null
-            $SUDO chmod 600 /etc/cloudmusic/env
+          SECRET=""
+          if [ -s /etc/cloudmusic/env ]; then
+            SECRET="$(sed -n 's/^JWT_SECRET=//p' /etc/cloudmusic/env | head -1)"
           fi
+          if [ -z "$SECRET" ]; then SECRET="$(openssl rand -hex 32)"; fi
+          $SUDO tee /etc/cloudmusic/env >/dev/null <<ENVFILE
+          JWT_SECRET=$SECRET
+          NODE_ENV=production
+          HOST=127.0.0.1
+          PORT=$PORT
+          XIAOYUN_DATA_DIR=/var/lib/cloudmusic
+          CORS_ORIGINS=*
+          MAX_UPLOAD_BYTES=209715200
+          ENVFILE
+          $SUDO chmod 600 /etc/cloudmusic/env
 
           log "6/8 写入 systemd 并启动"
           NODE_BIN="$(command -v node)"
@@ -159,57 +171,147 @@ jobs:
           curl -fsS "http://127.0.0.1:$PORT/api/health"
           echo
 
-          log "7/8 配置 nginx 反代"
-          if ! command -v nginx >/dev/null 2>&1; then
-            $SUDO apt-get install -y -qq nginx
+          log "7/8 配置 nginx 反向代理"
+          NGINX_BIN="/www/server/nginx/sbin/nginx"
+          if [ ! -x "$NGINX_BIN" ]; then NGINX_BIN="$(command -v nginx || true)"; fi
+          if [ -z "$NGINX_BIN" ]; then
+            echo "::error::没有找到 nginx：请在宝塔面板新建站点，或先安装 nginx"
+            exit 3
           fi
-          CONF="/etc/nginx/conf.d/cloudmusic-$DOMAIN.conf"
-          $SUDO tee "$CONF" >/dev/null <<CONF2
+          if [ -d /www/server/panel/vhost/nginx ]; then
+            VHOST_DIR=/www/server/panel/vhost/nginx
+            WEBROOT=/www/wwwroot/$DOMAIN
+            CERT_DIR=/www/server/nginx/conf
+            NGINX_OWNER=bt
+          else
+            VHOST_DIR=/etc/nginx/conf.d
+            WEBROOT=/var/www/$DOMAIN
+            CERT_DIR=/etc/letsencrypt/live/$DOMAIN
+            NGINX_OWNER=plain
+          fi
+          echo "nginx 模式：$NGINX_OWNER（$NGINX_BIN，vhost $VHOST_DIR）"
+          $SUDO mkdir -p "$WEBROOT/.well-known/acme-challenge"
+
+          CONF="$VHOST_DIR/$DOMAIN.conf"
+          if [ -f "$CONF" ]; then
+            echo "已存在 $CONF，保留现有站点配置"
+          else
+            $SUDO install -d -m 700 "$CERT_DIR"
+            TMPCONF=/tmp/cloudmusic-$DOMAIN.conf
+            cat > "$TMPCONF" <<WEBCFG
           server {
-            listen 80;
-            listen [::]:80;
-            server_name $DOMAIN;
+              listen 80;
+              server_name $DOMAIN;
 
-            client_max_body_size 200m;
+              client_max_body_size 200m;
 
-            location / {
-              proxy_pass http://127.0.0.1:$PORT;
-              proxy_http_version 1.1;
-              proxy_set_header Host \$host;
-              proxy_set_header X-Real-IP \$remote_addr;
-              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto \$scheme;
-              proxy_set_header Upgrade \$http_upgrade;
-              proxy_set_header Connection "";
-              proxy_read_timeout 300s;
-              proxy_send_timeout 300s;
-            }
+              location ^~ /.well-known/acme-challenge/ {
+                  root $WEBROOT;
+                  default_type "text/plain";
+              }
+
+              location / {
+                  proxy_pass http://127.0.0.1:$PORT;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_read_timeout 300s;
+                  proxy_send_timeout 300s;
+              }
           }
-          CONF2
-          $SUDO nginx -t
-          $SUDO systemctl reload nginx
+          WEBCFG
+            $SUDO tee "$CONF" < "$TMPCONF" >/dev/null
+            CREATED=1
+          fi
+
+          $SUDO "$NGINX_BIN" -t
+          $SUDO systemctl reload nginx || $SUDO "$NGINX_BIN" -s reload
           sleep 1
           LOCAL="$(curl -fsS -H "Host: $DOMAIN" http://127.0.0.1/api/health || true)"
           echo "本机按 Host 访问：$LOCAL"
           case "$LOCAL" in
             *cloudmusic*) : ;;
-            *) echo "::error::nginx 没有把 $DOMAIN 指向本服务（可能被面板或默认站点截走），请检查 nginx -T 里 server_name 的先后顺序"; exit 4 ;;
+            *)
+              echo "::error::nginx 没有把 $DOMAIN 指向本服务（可能被面板或默认站点截走）"
+              if [ "${CREATED:-0}" = "1" ]; then
+                $SUDO rm -f "$CONF"
+                $SUDO "$NGINX_BIN" -t && ($SUDO systemctl reload nginx || $SUDO "$NGINX_BIN" -s reload) || true
+                echo "已回滚新写入的 $CONF"
+              fi
+              exit 4
+              ;;
           esac
 
           log "8/8 申请 HTTPS 证书"
-          if [ "$SKIP_CERTBOT" = "true" ]; then
-            echo "已跳过 certbot"
-          else
-            if ! command -v certbot >/dev/null 2>&1; then
-              $SUDO apt-get install -y -qq certbot python3-certbot-nginx
-            fi
-            $SUDO certbot --nginx -d "$DOMAIN" -n --agree-tos -m "admin@$DOMAIN" --redirect --keep-until-expiring \
-              || $SUDO certbot --nginx -d "$DOMAIN" -n --agree-tos --register-unsafely-without-email --redirect --keep-until-expiring \
-              || echo "::warning::证书签发失败，先保留 http，请检查 80 端口是否放行"
-            sleep 1
-            $SUDO nginx -t
-            $SUDO systemctl reload nginx
+          CRT=""
+          KEY=""
+          if [ -f "$CERT_DIR/$DOMAIN.crt" ]; then
+            CRT="$CERT_DIR/$DOMAIN.crt"
+            KEY="$CERT_DIR/$DOMAIN.key"
           fi
+          if [ -z "$CRT" ] && [ "$SKIP_CERTBOT" != "true" ]; then
+            if [ -x /root/.acme.sh/acme.sh ]; then
+              /root/.acme.sh/acme.sh --issue -d "$DOMAIN" --webroot "$WEBROOT" --keylength ec-256 \
+                || echo "::warning::acme.sh 签发失败，请检查 80 端口是否放行"
+              /root/.acme.sh/acme.sh --install-cert -d "$DOMAIN" --ecc \
+                --key-file "$CERT_DIR/$DOMAIN.key" \
+                --fullchain-file "$CERT_DIR/$DOMAIN.crt" \
+                --reloadcmd "systemctl reload nginx" || true
+            elif command -v certbot >/dev/null 2>&1; then
+              $SUDO certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" -n --agree-tos \
+                -m "admin@$DOMAIN" --keep-until-expiring \
+                || $SUDO certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" -n --agree-tos \
+                --register-unsafely-without-email --keep-until-expiring \
+                || echo "::warning::certbot 签发失败"
+            else
+              echo "::warning::没有 acme.sh / certbot，跳过证书申请，先保留 http"
+            fi
+            if [ -f "$CERT_DIR/$DOMAIN.crt" ]; then
+              CRT="$CERT_DIR/$DOMAIN.crt"
+              KEY="$CERT_DIR/$DOMAIN.key"
+            elif [ -f "$CERT_DIR/fullchain.pem" ]; then
+              CRT="$CERT_DIR/fullchain.pem"
+              KEY="$CERT_DIR/privkey.pem"
+            fi
+          fi
+
+          if [ -n "$CRT" ] && ! grep -q "listen 443" "$CONF"; then
+            cat > /tmp/cloudmusic-$DOMAIN-ssl.conf <<SSLCFG
+          server {
+              listen 443 ssl;
+              server_name $DOMAIN;
+
+              ssl_certificate $CRT;
+              ssl_certificate_key $KEY;
+              ssl_protocols TLSv1.2 TLSv1.3;
+
+              client_max_body_size 200m;
+
+              location / {
+                  proxy_pass http://127.0.0.1:$PORT;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_read_timeout 300s;
+                  proxy_send_timeout 300s;
+              }
+          }
+          SSLCFG
+            $SUDO tee -a "$CONF" < /tmp/cloudmusic-$DOMAIN-ssl.conf >/dev/null
+            echo "已追加 443 server 块：$CRT"
+          fi
+
+          $SUDO "$NGINX_BIN" -t
+          $SUDO systemctl reload nginx || $SUDO "$NGINX_BIN" -s reload
+          sleep 1
 
           log "验收"
           curl -fsS "https://$DOMAIN/api/health" || curl -fsS "http://$DOMAIN/api/health"
