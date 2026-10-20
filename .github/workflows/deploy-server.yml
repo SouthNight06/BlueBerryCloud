@@ -19,6 +19,8 @@ on:
         description: 跳过证书签发（填 true 可跳过）
         required: false
         default: "false"
+  push:
+    branches: [deploy]
 
 permissions:
   contents: read
@@ -217,10 +219,10 @@ jobs:
 
       - name: Upload and run
         env:
-          DOMAIN: ${{ inputs.domain }}
-          PORT: ${{ inputs.port }}
-          APPDIR: ${{ inputs.app_dir }}
-          SKIP_CERTBOT: ${{ inputs.skip_certbot }}
+          DOMAIN: ${{ inputs.domain || 'music.lichenlc.cn' }}
+          PORT: ${{ inputs.port || '3001' }}
+          APPDIR: ${{ inputs.app_dir || '/opt/cloudmusic' }}
+          SKIP_CERTBOT: ${{ inputs.skip_certbot || 'false' }}
         run: |
           set -euo pipefail
           scp -q remote-setup.sh target:/tmp/cloudmusic-setup.sh
@@ -228,7 +230,7 @@ jobs:
 
       - name: Verify from runner
         env:
-          DOMAIN: ${{ inputs.domain }}
+          DOMAIN: ${{ inputs.domain || 'music.lichenlc.cn' }}
         run: |
           set -euo pipefail
           for i in 1 2 3 4 5; do
