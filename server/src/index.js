@@ -25,9 +25,15 @@ app.use((req, res, next) => {
   if (allowed) {
     res.setHeader("Access-Control-Allow-Origin", CORS_ORIGINS.includes("*") ? "*" : origin);
     res.setHeader("Vary", "Origin");
-    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type, Range, If-Range",
+    );
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range");
+    res.setHeader(
+      "Access-Control-Expose-Headers",
+      "Content-Length, Content-Range, Accept-Ranges",
+    );
   }
   if (req.method === "OPTIONS") {
     res.status(204).end();
@@ -60,6 +66,15 @@ app.use("/api", (_req, res) => {
 const indexHtml = path.join(WEB_DIST, "index.html");
 
 app.use("/covers", express.static(COVER_CACHE_DIR, { index: false, maxAge: "7d" }));
+
+app.use(
+  "/media",
+  express.static(MEDIA_DIR, {
+    index: false,
+    maxAge: "1d",
+    acceptRanges: true,
+  }),
+);
 
 if (fs.existsSync(indexHtml)) {
   app.use(express.static(WEB_DIST, { index: false, maxAge: "1h" }));

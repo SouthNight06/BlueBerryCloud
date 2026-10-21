@@ -76,42 +76,70 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const balanceTimer = useRef(0);
   const smoothRef = useRef(1);
   const levelRef = useRef({ volume, muted });
+  const graphDisabledRef = useRef(false);
+  const corsBlockedRef = useRef(false);
+  const [graphVersion, setGraphVersion] = useState(0);
 
   useEffect(() => {
     levelRef.current = { volume, muted };
   }, [volume, muted]);
 
   const ensureGraph = useCallback(() => {
+    if (graphDisabledRef.current) return;
     const audio = audioRef.current;
     if (!audio) return;
-    const existing = audioCtxRef.current;
-    if (existing) {
-      if (existing.state === "suspended") void existing.resume();
+    if (analyserRef.current) {
+      if (audioCtxRef.current?.state === "suspended") void audioCtxRef.current.resume();
       return;
     }
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return;
-    try {
-      const ctx = new Ctor();
-      const source = ctx.createMediaElementSource(audio);
-      const gain = ctx.createGain();
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.25;
-      source.connect(gain);
-      gain.connect(analyser);
-      analyser.connect(ctx.destination);
+    let ctx = audioCtxRef.current;
+    if (!ctx) {
+      const Ctor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) {
+        graphDisabledRef.current = true;
+        return;
+      }
+      try {
+        ctx = new Ctor();
+      } catch {
+        graphDisabledRef.current = true;
+        return;
+      }
       audioCtxRef.current = ctx;
-      gainRef.current = gain;
-      analyserRef.current = analyser;
-      if (ctx.state === "suspended") void ctx.resume();
-    } catch {
-      audioCtxRef.current = null;
-      gainRef.current = null;
-      analyserRef.current = null;
     }
+    const build = () => {
+      if (analyserRef.current || graphDisabledRef.current) return;
+      try {
+        const source = ctx!.createMediaElementSource(audio);
+        const gain = ctx!.createGain();
+        const analyser = ctx!.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.25;
+        source.connect(gain);
+        gain.connect(analyser);
+        analyser.connect(ctx!.destination);
+        gainRef.current = gain;
+        analyserRef.current = analyser;
+      } catch {
+        graphDisabledRef.current = true;
+        gainRef.current = null;
+        analyserRef.current = null;
+        return;
+      }
+      setGraphVersion((version) => version + 1);
+    };
+    if (ctx.state === "running") {
+      build();
+      return;
+    }
+    void ctx
+      .resume()
+      .then(() => {
+        if (ctx!.state === "running") build();
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -123,7 +151,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!balance || !playing) return;
-    ensureGraph();
     const analyser = analyserRef.current;
     const gain = gainRef.current;
     if (!analyser || !gain) return;
@@ -149,11 +176,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       window.clearInterval(balanceTimer.current);
       balanceTimer.current = 0;
     };
-  }, [balance, playing, ensureGraph]);
+  }, [balance, playing, graphVersion]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    corsBlockedRef.current = false;
+    graphDisabledRef.current = false;
+    if (audio.crossOrigin !== "anonymous") audio.crossOrigin = "anonymous";
     if (!current) {
       audio.removeAttribute("src");
       audio.load();
@@ -198,7 +228,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       resetWaveBus();
       return;
     }
-    ensureGraph();
     const analyser = analyserRef.current;
     if (!analyser) return;
 
@@ -310,18 +339,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         root.style.setProperty("--dj-lift", "0");
       }
     };
-  }, [playing, djMode, ensureGraph]);
+  }, [playing, djMode, graphVersion]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     if (playing) {
-      if (balance || djMode) ensureGraph();
       void audio.play().catch(() => setPlaying(false));
     } else {
       audio.pause();
     }
-  }, [playing, current, balance, djMode, ensureGraph]);
+  }, [playing, current]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -329,19 +357,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.volume = muted ? 0 : volume;
   }, [volume, muted]);
 
-  const playQueue = useCallback((tracks: Track[], startIndex = 0) => {
-    if (tracks.length === 0) return;
-    const safeIndex = Math.min(Math.max(startIndex, 0), tracks.length - 1);
-    setQueue(tracks);
-    setIndex(safeIndex);
-    setProgress(0);
-    setPlaying(true);
-  }, []);
+  const playQueue = useCallback(
+    (tracks: Track[], startIndex = 0) => {
+      if (tracks.length === 0) return;
+      ensureGraph();
+      const safeIndex = Math.min(Math.max(startIndex, 0), tracks.length - 1);
+      setQueue(tracks);
+      setIndex(safeIndex);
+      setProgress(0);
+      setPlaying(true);
+    },
+    [ensureGraph],
+  );
 
   const toggle = useCallback(() => {
     if (!current) return;
+    ensureGraph();
     setPlaying((value) => !value);
-  }, [current]);
+  }, [current, ensureGraph]);
 
   const next = useCallback(
     (auto = false) => {
@@ -481,15 +514,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       <audio
         ref={audioRef}
         preload="metadata"
+        crossOrigin="anonymous"
         className="sr-only"
         onTimeUpdate={(event) => setProgress(event.currentTarget.currentTime)}
         onLoadedMetadata={(event) => {
           const value = event.currentTarget.duration;
           setDuration(Number.isFinite(value) ? value : 0);
+          if (graphDisabledRef.current) return;
+          ensureGraph();
         }}
         onEnded={handleEnded}
         onPlay={() => setPlaying(true)}
-        onError={() => {
+        onError={(event) => {
+          const audio = event.currentTarget;
+          if (!corsBlockedRef.current && audio.crossOrigin) {
+            corsBlockedRef.current = true;
+            graphDisabledRef.current = true;
+            audio.removeAttribute("crossOrigin");
+            if (current) {
+              audio.src = withToken(current.streamUrl);
+              audio.load();
+              if (playing) void audio.play().catch(() => setPlaying(false));
+            }
+            return;
+          }
           setPlaying(false);
           push("音频加载失败，可能是音源暂时无法访问", "error");
         }}
