@@ -139,8 +139,13 @@ jobs:
           }
           sync_tar() {
             TMPD="$(mktemp -d)"
-            curl -fsSL --retry 4 --retry-all-errors --retry-delay 3 --connect-timeout 20 --max-time 300 \
-              "https://codeload.github.com/SouthNight06/BlueBerryCloud/tar.gz/refs/heads/main" -o "$TMPD/src.tar.gz"
+            if [ -s /tmp/cloudmusic-src.tar.gz ]; then
+              echo "  使用 runner 预下载的源码包"
+              cp /tmp/cloudmusic-src.tar.gz "$TMPD/src.tar.gz"
+            else
+              curl -fsSL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 90 \
+                "https://codeload.github.com/SouthNight06/BlueBerryCloud/tar.gz/refs/heads/main" -o "$TMPD/src.tar.gz"
+            fi
             tar -xzf "$TMPD/src.tar.gz" -C "$TMPD"
             $SUDO mkdir -p "$APPDIR"
             if command -v rsync >/dev/null 2>&1; then
@@ -149,6 +154,7 @@ jobs:
               $SUDO cp -a "$TMPD"/BlueBerryCloud-main/. "$APPDIR"/
             fi
             rm -rf "$TMPD"
+            rm -f /tmp/cloudmusic-src.tar.gz
           }
           SYNC_OK=0
           SYNC_HEAD=""
@@ -414,8 +420,12 @@ jobs:
           set -euo pipefail
           tar -czf web-dist.tgz -C web/dist .
           ls -lh web-dist.tgz
+          curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 120 \
+            "https://codeload.github.com/SouthNight06/BlueBerryCloud/tar.gz/refs/heads/main" -o src.tar.gz
+          ls -lh src.tar.gz
           scp -q remote-setup.sh target:/tmp/cloudmusic-setup.sh
           scp -q web-dist.tgz target:/tmp/cloudmusic-web-dist.tgz
+          scp -q src.tar.gz target:/tmp/cloudmusic-src.tar.gz
           ssh -tt target "DOMAIN='$DOMAIN' PORT='$PORT' APPDIR='$APPDIR' SKIP_CERTBOT='$SKIP_CERTBOT' WANT_SHA='$GITHUB_SHA' bash /tmp/cloudmusic-setup.sh"
 
       - name: Verify from runner
