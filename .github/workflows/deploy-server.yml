@@ -140,19 +140,14 @@ jobs:
           sync_tar() {
             TMPD="$(mktemp -d)"
             if [ -s /tmp/cloudmusic-src.tar.gz ]; then
-              echo "  使用 runner 预下载的源码包"
+              echo "  使用 runner 预打包的源码"
               cp /tmp/cloudmusic-src.tar.gz "$TMPD/src.tar.gz"
             else
               curl -fsSL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 90 \
                 "https://codeload.github.com/SouthNight06/BlueBerryCloud/tar.gz/refs/heads/main" -o "$TMPD/src.tar.gz"
             fi
-            tar -xzf "$TMPD/src.tar.gz" -C "$TMPD"
             $SUDO mkdir -p "$APPDIR"
-            if command -v rsync >/dev/null 2>&1; then
-              $SUDO rsync -a --delete --exclude .git "$TMPD"/BlueBerryCloud-main/ "$APPDIR"/
-            else
-              $SUDO cp -a "$TMPD"/BlueBerryCloud-main/. "$APPDIR"/
-            fi
+            $SUDO tar -xzf "$TMPD/src.tar.gz" -C "$APPDIR" --strip-components=1 --no-same-owner
             rm -rf "$TMPD"
             rm -f /tmp/cloudmusic-src.tar.gz
           }
@@ -420,8 +415,9 @@ jobs:
           set -euo pipefail
           tar -czf web-dist.tgz -C web/dist .
           ls -lh web-dist.tgz
-          curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 120 \
-            "https://codeload.github.com/SouthNight06/BlueBerryCloud/tar.gz/refs/heads/main" -o src.tar.gz
+          mkdir -p srcpack/BlueBerryCloud-main
+          git archive HEAD server package.json | tar -x -C srcpack/BlueBerryCloud-main
+          tar -czf src.tar.gz -C srcpack BlueBerryCloud-main
           ls -lh src.tar.gz
           scp -q remote-setup.sh target:/tmp/cloudmusic-setup.sh
           scp -q web-dist.tgz target:/tmp/cloudmusic-web-dist.tgz
