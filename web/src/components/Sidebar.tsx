@@ -1,3 +1,4 @@
+import { LOCAL_MODE } from "../api/mode";
 import { formatDate } from "../lib/format";
 import { routeHref } from "../lib/route";
 import type { Route } from "../lib/route";
@@ -13,13 +14,17 @@ type NavItem = {
   icon: IconName;
 };
 
-const NAV: NavItem[] = [
+const ALL_NAV: NavItem[] = [
   { route: { name: "discover" }, label: "发现", icon: "search" },
   { route: { name: "library" }, label: "音乐库", icon: "disc" },
   { route: { name: "playlists" }, label: "歌单", icon: "list" },
   { route: { name: "bilibili" }, label: "哔哩哔哩", icon: "bilibili" },
   { route: { name: "themes" }, label: "外观", icon: "swatch" },
 ];
+
+const NAV: NavItem[] = ALL_NAV.filter(
+  (item) => !(LOCAL_MODE && item.route.name === "bilibili"),
+);
 
 export function Sidebar({ route }: { route: Route }) {
   const { user, tracks, playlists, syncedAt, logout } = useApp();
@@ -111,7 +116,9 @@ export function Sidebar({ route }: { route: Route }) {
           <span className="avatar">{user.username.slice(0, 1).toUpperCase()}</span>
           <span className="rail__who">
             <strong>{user.username}</strong>
-            <span>{syncedAt ? `已同步 ${formatDate(syncedAt)}` : "云端存储"}</span>
+            <span>
+              {LOCAL_MODE ? "本地存储" : syncedAt ? `已同步 ${formatDate(syncedAt)}` : "云端存储"}
+            </span>
           </span>
           <a
             className="ibtn"

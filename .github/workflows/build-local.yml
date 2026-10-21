@@ -1,4 +1,4 @@
-﻿name: build-local
+name: build-local
 
 on:
   workflow_dispatch:
@@ -6,9 +6,150 @@ on:
     tags:
       - "local-v*"
 
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "22"
+  CSC_IDENTITY_AUTO_DISCOVERY: "false"
+  VITE_LOCAL_MODE: "1"
+
 jobs:
-  probe:
+  desktop:
+    name: desktop-local (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux
+            artifact: CloudMusic-Local-*.AppImage
+          - os: windows-latest
+            target: win
+            artifact: CloudMusic-Local-*.exe
+          - os: macos-latest
+            target: mac
+            artifact: CloudMusic-Local-*.dmg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            desktop/package-lock.json
+
+      - name: Build web
+        run: |
+          npm ci
+          npm run build
+        working-directory: web
+
+      - name: Install desktop deps
+        run: npm ci
+        working-directory: desktop
+
+      - name: Package ${{ matrix.target }}
+        run: npx electron-builder --${{ matrix.target }} --publish never
+        working-directory: desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-local-${{ matrix.target }}
+          path: desktop/release/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  android:
+    name: android-local
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "local probe ok"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Accept Android SDK licenses
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+
+      - name: Build web
+        run: |
+          npm ci
+          npm run build
+        working-directory: web
+
+      - name: Capacitor sync
+        run: npx cap sync android
+        working-directory: web
+
+      - name: Prepare signing key
+        working-directory: web/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > ci-release.jks
+            echo "XIAOYUN_KEYSTORE_PATH=$PWD/ci-release.jks" >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -v -keystore ci-debug.jks -storepass xiaoyun123456 \
+              -keypass xiaoyun123456 -alias xiaoyun -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=CloudMusic, O=Xiaoyun House, C=CN"
+            echo "XIAOYUN_KEYSTORE_PATH=$PWD/ci-debug.jks" >> "$GITHUB_ENV"
+          fi
+          echo "XIAOYUN_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'xiaoyun123456' }}" >> "$GITHUB_ENV"
+          echo "XIAOYUN_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS || 'xiaoyun' }}" >> "$GITHUB_ENV"
+          echo "XIAOYUN_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD || 'xiaoyun123456' }}" >> "$GITHUB_ENV"
+
+      - name: Assemble release
+        run: ./gradlew assembleRelease --no-daemon
+        working-directory: web/android
+
+      - name: Collect APK
+        run: |
+          mkdir -p ../../out
+          cp app/build/outputs/apk/release/app-release*.apk \
+             "../../out/CloudMusic-Local-${GITHUB_REF_NAME#local-v}.apk" 2>/dev/null \
+            || cp app/build/outputs/apk/release/app-release*.apk "../../out/CloudMusic-Local.apk"
+        working-directory: web/android
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-local
+          path: out/*.apk
+          if-no-files-found: error
+
+  release:
+    name: publish local release
+    if: startsWith(github.ref, 'refs/tags/local-v')
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect
+        run: |
+          mkdir -p dist
+          find artifacts -type f \( -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.apk" \) -exec cp {} dist/ \;
+          ls -lh dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          prerelease: true
+          generate_release_notes: true

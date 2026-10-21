@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { api } from "../api/client";
+import { LOCAL_MODE } from "../api/mode";
 import type { SearchResult, SourceStatus, Track } from "../api/types";
 import { Icon } from "../components/Icon";
 import { PlaylistPicker } from "../components/PlaylistPicker";
@@ -30,6 +31,14 @@ export function DiscoverView() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (LOCAL_MODE) {
+      setResults([]);
+      setStatuses([]);
+      setSearching(false);
+      setError("");
+      return;
+    }
+
     const value = query.trim();
     if (!value) {
       setResults([]);
@@ -114,13 +123,23 @@ export function DiscoverView() {
 
   const degraded = statuses.filter((item) => !item.ok);
   const trimmed = query.trim();
+  const localHits =
+    LOCAL_MODE && trimmed
+      ? tracks.filter((track) =>
+          `${track.title} ${track.artist} ${track.album}`.toLowerCase().includes(trimmed.toLowerCase()),
+        )
+      : [];
 
   return (
     <div className="view">
       <header className="view__head">
         <div>
           <h1 className="view__title">发现</h1>
-          <p className="view__sub">搜索合规曲库，或把本地音频导入音乐库；歌单与主题都同步在服务器。</p>
+          <p className="view__sub">
+            {LOCAL_MODE
+              ? "把本机音频导入曲库，歌曲、歌单与设置都只保存在这台设备上。"
+              : "搜索合规曲库，或把本地音频导入音乐库；歌单与主题都同步在服务器。"}
+          </p>
         </div>
         <div className="view__actions">
           <button
@@ -147,7 +166,7 @@ export function DiscoverView() {
           <Icon name="search" size={16} />
           <input
             value={query}
-            placeholder="搜索曲名、艺术家或专辑"
+            placeholder={LOCAL_MODE ? "搜索本机曲库" : "搜索曲名、艺术家或专辑"}
             onChange={(event) => setQuery(event.currentTarget.value)}
             aria-label="搜索音乐"
           />
@@ -159,7 +178,8 @@ export function DiscoverView() {
         </div>
       </div>
 
-      <div className="filters">
+      {LOCAL_MODE ? null : (
+        <div className="filters">
         <button
           type="button"
           className="chip"
@@ -182,7 +202,8 @@ export function DiscoverView() {
             {item.name}
           </button>
         ))}
-      </div>
+        </div>
+      )}
 
       {degraded.length > 0 ? (
         <div className="notice">
@@ -201,7 +222,50 @@ export function DiscoverView() {
         </div>
       ) : null}
 
-      {trimmed ? (
+      {LOCAL_MODE && trimmed ? (
+        <section className="view__section">
+          <div className="view__legend">
+            <span>本机曲库</span>
+            <span className="num">{localHits.length} 首</span>
+          </div>
+
+          {localHits.length > 0 ? (
+            <div className="rows">
+              {localHits.map((track, index) => (
+                <TrackRow
+                  key={track.id}
+                  track={track}
+                  position={index + 1}
+                  active={track.id === currentId}
+                  playing={playing}
+                  onPlay={() => play(localHits, index)}
+                  actions={
+                    <button
+                      type="button"
+                      className="ibtn"
+                      onClick={() => setPickTarget(track)}
+                      aria-label="加入歌单"
+                      title="加入歌单"
+                    >
+                      <Icon name="plus" size={15} />
+                    </button>
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty">
+              <span className="empty__icon">
+                <Icon name="search" size={22} />
+              </span>
+              <div className="empty__title">没有找到结果</div>
+              <p className="empty__text">本机曲库里没有匹配的歌，换个关键词，或先导入音频。</p>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {!LOCAL_MODE && trimmed ? (
         <section className="view__section">
           <div className="view__legend">
             <span>{searching ? "搜索中…" : "搜索结果"}</span>
@@ -266,7 +330,7 @@ export function DiscoverView() {
             </div>
           ) : null}
         </section>
-      ) : tracks.length > 0 ? (
+      ) : tracks.length > 0 && !(LOCAL_MODE && trimmed) ? (
         <section className="view__section">
           <div className="view__legend">
             <span>音乐库最新</span>
@@ -310,27 +374,31 @@ export function DiscoverView() {
             ))}
           </div>
         </section>
-      ) : (
+      ) : LOCAL_MODE && trimmed ? null : (
         <div className="empty">
           <span className="empty__icon">
             <Icon name="disc" size={24} />
           </span>
           <div className="empty__title">从一首歌开始</div>
           <p className="empty__text">
-            在上方搜索合规曲库，或把手机、电脑里的音频文件导入。导入后的歌曲可以加入歌单并同步到云端。
+            {LOCAL_MODE
+              ? "点右上角「导入本地音频」把手机、电脑里的音频加进来。歌曲与歌单只保存在本机。"
+              : "在上方搜索合规曲库，或把手机、电脑里的音频文件导入。导入后的歌曲可以加入歌单并同步到云端。"}
           </p>
-          <div className="hints">
-            {SUGGESTIONS.map((word) => (
-              <button
-                key={word}
-                type="button"
-                className="chip"
-                onClick={() => setQuery(word)}
-              >
-                {word}
-              </button>
-            ))}
-          </div>
+          {LOCAL_MODE ? null : (
+            <div className="hints">
+              {SUGGESTIONS.map((word) => (
+                <button
+                  key={word}
+                  type="button"
+                  className="chip"
+                  onClick={() => setQuery(word)}
+                >
+                  {word}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

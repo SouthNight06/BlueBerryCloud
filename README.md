@@ -12,12 +12,13 @@
 
 界面走安静克制的路线：圆角、留白、细腻的层次与柔和的高光，中文字形使用猫啃珠圆体，英文字形回退到 Comic Sans，所有歌词与标题统一由 `--font-cute` 变量驱动。
 
-> 小云说：v1.0.12 把弦卷心收回到它该在的位置——只在「单个」玩偶且开着 DJ 时出现，在底栏到处蹦跶；一旦切成全员或主唱，它就不掺和了，把舞台让给那排玩偶。
+> 小云说：这条分支是本地版——没有服务器、没有登录，打开就能听歌，歌单和主题都躺在自己的机器里。想搬家就把设置里的备份文件带走。
 
 ---
 
 ## 目录
 
+- [本地版](#本地版)
 - [功能特性](#功能特性)
 - [平台支持](#平台支持)
 - [技术栈](#技术栈)
@@ -30,6 +31,19 @@
 - [致谢](#致谢)
 - [字体许可](#字体许可)
 - [许可证](#许可证)
+
+---
+
+## 本地版
+
+`local` 分支是完全本机运行的变体：没有服务端、没有账号，也没有登录页。
+
+- 打开即可用，曲库、歌单、主题、播放偏好全部存在本机（桌面端与安卓都是浏览器的 IndexedDB）。
+- 哔哩哔哩相关入口在本版本里隐藏，不联网取任何数据；导入音乐请用「音乐库 → 导入」。
+- 换设备搬数据：设置 → 本机数据 → 导出备份 / 导入备份，产物是一个 JSON（音频以 base64 内嵌，文件会偏大）。
+- 桌面端不启动本地服务，Electron 通过自定义协议 `xiaoyun://app/` 直接加载打包好的前端；origin 固定，IndexedDB 不会因为端口变化丢数据。
+- 构建本地版前端：`VITE_LOCAL_MODE=1 npm run build`（`web/` 目录）。
+- 打 `local-v*` 标签会触发 `.github/workflows/build-local.yml`，产出 Windows / macOS / Linux 安装包与 `CloudMusic-Local-*.apk`，并以预发布 Release 发布，避免抢占正式版 Latest。
 
 ---
 
@@ -149,35 +163,28 @@
 
 ## 快速开始
 
-需要 Node.js **22.5 及以上**（服务端使用内置 `node:sqlite`）。
+需要 Node.js **22.5 及以上**。本地版没有服务端，直接把前端跑起来就行：
 
 ```bash
-# 1. 启动服务端
-cd server
-npm install
-npm start
-# 默认监听 http://127.0.0.1:3001
-
-# 2. 启动前端开发服务器
 cd web
 npm install
-npm run dev
-# 打开 http://127.0.0.1:5173，/api 与 /media 已代理到 3001
+VITE_LOCAL_MODE=1 npm run dev
+# 打开 http://127.0.0.1:5173，数据写在浏览器的 IndexedDB 里
 ```
 
-首次启动会在 `server/data/` 下生成 SQLite 数据库，并在 `server/media/demo/` 放置几首可离线播放的示例曲目，方便直接验证播放链路。
+打包本地版前端：`VITE_LOCAL_MODE=1 npm run build`（产物在 `web/dist`，桌面端与安卓都吃这一份）。
 
 ### 桌面端
 
 ```bash
-cd web && npm run build
+cd web
+VITE_LOCAL_MODE=1 npm run build
 cd ../desktop
 npm install
-npm run build:server   # 用 esbuild 把服务端打成单文件
 npm start
 ```
 
-桌面端启动时先探测 `https://music.lichenlc.cn/api/health`：连得上就直接加载服务器上的同一套界面，账号、歌单和手机、浏览器完全一致；连不上才回退到内置本地服务，把数据写进系统用户数据目录下的 `library/`。想强制本地模式设 `XIAOYUN_DESKTOP_LOCAL=1`，换服务器地址用 `XIAOYUN_REMOTE_BASE`。
+桌面端不启动任何后端服务：Electron 用自定义协议 `xiaoyun://app/` 把 `web/dist` 直接喂给渲染进程，数据写在这个固定 origin 下的 IndexedDB 里——重启、换端口都不会丢。
 
 ### Android
 
@@ -190,7 +197,7 @@ npx cap open android
 npm run android:apk
 ```
 
-APK 内的前端默认连随应用内置的地址（当前是 `https://music.lichenlc.cn`），启动时还会去仓库根的 [`client-config.json`](client-config.json) 拉一次最新地址并缓存。**普通用户装好就能登录，不需要填 IP 或端口**；只有换服务器时才由维护者改配置，构建期也可以用 `VITE_API_BASE` 覆盖内置地址。
+APK 里打包的就是本地版前端，装好打开即用，不需要填服务器地址、也不需要登录；数据存在 App 自己的 WebView 存储里，卸载会一并清掉，记得先导出备份。
 
 ### 手机端怎么连服务器
 
