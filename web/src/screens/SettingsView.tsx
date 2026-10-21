@@ -5,6 +5,7 @@ import type { BiliAccount, CacheStats } from "../api/types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
 import { describeError, formatBytes, formatDate } from "../lib/format";
+import { waveBus } from "../lib/spectrum";
 import { useApp } from "../state/AppStore";
 import {
   DJ_STRENGTH_MAX,
@@ -14,7 +15,7 @@ import {
 import { useToast } from "../state/ToastStore";
 import { useUi } from "../state/UiStore";
 
-const VERSION = "1.0.7";
+const VERSION = "1.0.8";
 
 const CREDITS = [
   {
@@ -71,10 +72,27 @@ export function SettingsView() {
   const djMode = Boolean(preferences.djMode);
   const djStrength = normalizeDjStrength(preferences.djStrength);
   const [strengthDraft, setStrengthDraft] = useState(djStrength);
+  const autoTempo = preferences.djAutoTempo !== false;
+  const [tempo, setTempo] = useState({ bpm: 0, factor: 1 });
 
   useEffect(() => {
     setStrengthDraft(djStrength);
   }, [djStrength]);
+
+  useEffect(() => {
+    if (!djMode) {
+      setTempo({ bpm: 0, factor: 1 });
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setTempo((current) =>
+        Math.abs(current.bpm - waveBus.bpm) < 1 && Math.abs(current.factor - waveBus.tempoFactor) < 0.01
+          ? current
+          : { bpm: waveBus.bpm, factor: waveBus.tempoFactor },
+      );
+    }, 700);
+    return () => window.clearInterval(timer);
+  }, [djMode]);
 
   const loadBili = useCallback(async () => {
     setBiliBusy(true);
@@ -145,6 +163,15 @@ export function SettingsView() {
   };
 
   const strengthFill = ((strengthDraft - DJ_STRENGTH_MIN) / (DJ_STRENGTH_MAX - DJ_STRENGTH_MIN)) * 100;
+
+  const toggleAutoTempo = async () => {
+    const next = !autoTempo;
+    const ok = await attempt(async () => {
+      await updatePreferences({ djAutoTempo: next });
+      return true;
+    });
+    if (ok) push(next ? "已开启节拍自适应强度" : "已关闭节拍自适应强度");
+  };
 
   const clearCache = async (target: "covers" | "orphans" | "all") => {
     if (clearing) return;
@@ -358,6 +385,38 @@ export function SettingsView() {
                   onBlur={() => void commitStrength()}
                 />
               </div>
+            </div>
+          </div>
+          <div className="setrow">
+            <div className="setrow__main">
+              <div className="setrow__title">
+                跟随节拍自动调节
+                {autoTempo && tempo.bpm > 0 ? (
+                  <span className="num">
+                    {Math.round(tempo.bpm)} BPM · 幅度 {tempo.factor.toFixed(2)}×
+                  </span>
+                ) : null}
+              </div>
+              <div className="setrow__desc">
+                {autoTempo
+                  ? tempo.bpm > 0
+                    ? "最近识别到的曲速，小云会按这个 BPM 自动放大或收敛弹跳；上面的滑块仍是基准强度。"
+                    : "播放后自动识别曲目速度；识别出来之前先沿用滑块强度。"
+                  : "关闭后只按滑块强度弹跳，不随曲目速度变化。"}
+              </div>
+            </div>
+            <div className="setrow__act">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoTempo}
+                aria-label="跟随节拍自动调节"
+                className="switch"
+                data-on={autoTempo ? "true" : "false"}
+                onClick={() => void toggleAutoTempo()}
+              >
+                <span className="switch__knob" />
+              </button>
             </div>
           </div>
         </div>

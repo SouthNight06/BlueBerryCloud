@@ -7,6 +7,8 @@ type WaveBus = {
   squash: number;
   lift: number;
   active: boolean;
+  bpm: number;
+  tempoFactor: number;
 };
 
 export const waveBus: WaveBus = {
@@ -16,6 +18,8 @@ export const waveBus: WaveBus = {
   squash: 0,
   lift: 0,
   active: false,
+  bpm: 0,
+  tempoFactor: 1,
 };
 
 export function resetWaveBus() {

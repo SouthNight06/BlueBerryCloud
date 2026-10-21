@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { withToken } from "../api/client";
 import type { Track } from "../api/types";
 import { bandRanges, resetWaveBus, waveBus } from "../lib/spectrum";
+import { TempoTracker, tempoStrengthFactor } from "../lib/tempo";
 import { useApp } from "./AppStore";
 import { useToast } from "./ToastStore";
 
@@ -57,6 +58,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const balance = Boolean(settings?.preferences?.volumeBalance);
   const djMode = Boolean(settings?.preferences?.djMode);
   const djStrength = normalizeDjStrength(settings?.preferences?.djStrength);
+  const autoTempo = settings?.preferences?.djAutoTempo !== false;
+  const strengthRef = useRef(djStrength);
+  const autoTempoRef = useRef(autoTempo);
+  strengthRef.current = djStrength;
+  autoTempoRef.current = autoTempo;
 
   const [queue, setQueue] = useState<Track[]>([]);
   const [index, setIndex] = useState(-1);
@@ -69,6 +75,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [repeat, setRepeat] = useState<RepeatMode>("off");
 
   const current = index >= 0 ? (queue[index] ?? null) : null;
+  const currentId = current?.id ?? 0;
+
+  useEffect(() => {
+    waveBus.bpm = 0;
+    waveBus.tempoFactor = 1;
+  }, [currentId]);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
@@ -249,6 +261,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     let beat = 0;
     let last = 0;
     let raf = 0;
+    const tempo = new TempoTracker();
+    let lastTempo = 0;
+    let applied = strengthRef.current;
 
     const tick = (now: number) => {
       raf = window.requestAnimationFrame(tick);
@@ -290,6 +305,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       if (onset && sinceHit > 150) {
         if (lastHit > 0 && sinceHit < 900) gap = gap * 0.55 + sinceHit * 0.45;
         lastHit = now;
+        tempo.onset(now);
       }
 
       const age = lastHit < 0 ? Infinity : now - lastHit;
@@ -325,6 +341,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         root.style.setProperty("--dj-beat", beat.toFixed(3));
         root.style.setProperty("--dj-squash", squash.toFixed(3));
         root.style.setProperty("--dj-lift", lift.toFixed(3));
+
+        if (now - lastTempo > 160) {
+          lastTempo = now;
+          const reading = tempo.analyse();
+          const factor = autoTempoRef.current
+            ? tempoStrengthFactor(reading.bpm, reading.confidence)
+            : 1;
+          const effective = Math.min(
+            DJ_STRENGTH_MAX,
+            Math.max(DJ_STRENGTH_MIN, strengthRef.current * factor),
+          );
+          waveBus.bpm = reading.bpm;
+          waveBus.tempoFactor = factor;
+          root.style.setProperty("--dj-bpm", Math.round(reading.bpm).toString());
+          if (Math.abs(effective - applied) > 0.008) {
+            applied = effective;
+            root.style.setProperty("--dj-strength", effective.toFixed(2));
+          }
+        }
       }
     };
 
@@ -337,6 +372,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         root.style.setProperty("--dj-beat", "0");
         root.style.setProperty("--dj-squash", "0");
         root.style.setProperty("--dj-lift", "0");
+        root.style.setProperty("--dj-strength", strengthRef.current.toFixed(2));
       }
     };
   }, [playing, djMode, graphVersion]);
