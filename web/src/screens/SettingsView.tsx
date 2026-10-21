@@ -14,7 +14,7 @@ import {
 import { useToast } from "../state/ToastStore";
 import { useUi } from "../state/UiStore";
 
-const VERSION = "1.0.5";
+const VERSION = "1.0.6";
 
 const CREDITS = [
   {

@@ -1,6 +1,6 @@
 {
   "name": "cloudmusic-server",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "type": "module",
   "description": "小云畅听 backend — Express + node:sqlite",
