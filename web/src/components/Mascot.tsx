@@ -1,16 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { useApp } from "../state/AppStore";
+import { bounceElement } from "../lib/bounce";
 import { DOLLS, DOLL_GROUPS, DOLL_MODES, DOLL_MODE_LABEL, dollArt, findDoll, normalizeDollMode } from "../lib/dolls";
 
-const BOUNCE = [
-  { transform: "translateY(0) scale(1, 1)", offset: 0 },
-  { transform: "translateY(3px) scale(1.18, 0.76)", offset: 0.16 },
-  { transform: "translateY(-9px) scale(0.9, 1.2)", offset: 0.44 },
-  { transform: "translateY(0) scale(1.08, 0.94)", offset: 0.66 },
-  { transform: "translateY(-2px) scale(0.98, 1.03)", offset: 0.84 },
-  { transform: "translateY(0) scale(1, 1)", offset: 1 },
-];
 
 const PICKER_WIDTH = 276;
 
@@ -26,17 +19,7 @@ export function Mascot() {
   const masked = settings?.preferences?.mascotMask === true;
 
   const bounce = useCallback(() => {
-    const art = artRef.current;
-    if (!art || typeof art.animate !== "function") return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      art.animate([{ transform: "scale(1)" }, { transform: "scale(1.05)" }, { transform: "scale(1)" }], {
-        duration: 42,
-        easing: "linear",
-      });
-      return;
-    }
-    art.animate(BOUNCE, { duration: 680, easing: "cubic-bezier(0.34, 1.42, 0.62, 1)" });
+    bounceElement(artRef.current);
   }, []);
 
   const openPicker = useCallback(

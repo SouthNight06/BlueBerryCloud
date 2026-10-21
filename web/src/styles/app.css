@@ -897,7 +897,7 @@
 }
 
 :root[data-parade="on"] .djpet {
-  bottom: calc(var(--player-h) + var(--parade-h));
+  bottom: calc(var(--player-h) + var(--safe-bottom) + var(--parade-h) + 2px);
 }
 
 :root[data-parade="on"] .view {
@@ -2190,8 +2190,8 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: var(--player-h);
-  z-index: 88;
+  bottom: calc(var(--player-h) + var(--safe-bottom) + 2px);
+  z-index: 92;
   height: 0;
   pointer-events: none;
   animation: djpet-in 0.36s var(--ease) both;

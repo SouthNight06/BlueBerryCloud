@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { normalizeDollMode } from "../lib/dolls";
 import { useApp } from "../state/AppStore";
 
 const PET_SRC = "/dj-pet.png";
@@ -21,10 +22,12 @@ const PET_FALLBACK =
 export function DjPet() {
   const { settings } = useApp();
   const djMode = Boolean(settings?.preferences?.djMode);
+  const paradeMode = normalizeDollMode(settings?.preferences?.mascotMode) !== "single";
+  const active = djMode || paradeMode;
   const artRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    if (!djMode) return;
+    if (!active) return;
     const art = artRef.current;
     if (!art) return;
 
@@ -56,6 +59,17 @@ export function DjPet() {
       x = Math.min(x, Math.max(0, window.innerWidth - width));
       paint(0);
     };
+
+    if (!djMode) {
+      const stand = () => {
+        width = art.offsetWidth || 76;
+        x = Math.max(0, window.innerWidth - width - 26);
+        paint(0);
+      };
+      stand();
+      window.addEventListener("resize", stand);
+      return () => window.removeEventListener("resize", stand);
+    }
 
     if (reduceMotion) {
       x = Math.max(0, (window.innerWidth - width) / 2);
@@ -127,9 +141,9 @@ export function DjPet() {
       window.cancelAnimationFrame(raf);
       window.removeEventListener("resize", settle);
     };
-  }, [djMode]);
+  }, [active, djMode]);
 
-  if (!djMode) return null;
+  if (!active) return null;
 
   return (
     <div className="djpet" aria-hidden="true">
