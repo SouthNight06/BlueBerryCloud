@@ -23,7 +23,7 @@ export function DjPet() {
   const { settings } = useApp();
   const djMode = Boolean(settings?.preferences?.djMode);
   const paradeMode = normalizeDollMode(settings?.preferences?.mascotMode) !== "single";
-  const active = djMode || paradeMode;
+  const active = djMode && !paradeMode;
   const artRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -60,16 +60,6 @@ export function DjPet() {
       paint(0);
     };
 
-    if (!djMode) {
-      const stand = () => {
-        width = art.offsetWidth || 76;
-        x = Math.max(0, window.innerWidth - width - 26);
-        paint(0);
-      };
-      stand();
-      window.addEventListener("resize", stand);
-      return () => window.removeEventListener("resize", stand);
-    }
 
     if (reduceMotion) {
       x = Math.max(0, (window.innerWidth - width) / 2);

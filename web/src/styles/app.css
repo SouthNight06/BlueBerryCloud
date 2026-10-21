@@ -896,9 +896,6 @@
   }
 }
 
-:root[data-parade="on"] .djpet {
-  bottom: calc(var(--player-h) + var(--safe-bottom) + var(--parade-h) + 2px);
-}
 
 :root[data-parade="on"] .view {
   padding-bottom: calc(
