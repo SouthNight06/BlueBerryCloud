@@ -49,6 +49,7 @@ jobs:
           cache-dependency-path: |
             web/package-lock.json
             desktop/package-lock.json
+            server/package-lock.json
 
       - name: Build web (${{ matrix.flavor }})
         working-directory: web
@@ -62,6 +63,11 @@ jobs:
         working-directory: desktop
         run: npm ci
 
+      - name: Install server deps (online)
+        if: matrix.flavor == 'online'
+        working-directory: server
+        run: npm ci
+
       - name: Bundle server (online)
         if: matrix.flavor == 'online'
         working-directory: desktop
@@ -70,19 +76,17 @@ jobs:
       - name: Skip server bundle (local)
         if: matrix.flavor == 'local'
         working-directory: desktop
-        run: |
-          mkdir -p server-dist
-          touch server-dist/.keep
+        run: node -e "const f=require('node:fs');f.mkdirSync('server-dist',{recursive:true});f.writeFileSync('server-dist/.keep','')"
 
-      - name: Package ${{ matrix.target }}
+      - name: Package (online)
+        if: matrix.flavor == 'online'
         working-directory: desktop
-        run: |
-          if [ "${{ matrix.flavor }}" = "local" ]; then
-            npx electron-builder --${{ matrix.target }} --publish never \
-              --config.artifactName='CloudMusic-Local-${version}.${ext}'
-          else
-            npx electron-builder --${{ matrix.target }} --publish never
-          fi
+        run: npx electron-builder --${{ matrix.target }} --publish never
+
+      - name: Package (local)
+        if: matrix.flavor == 'local'
+        working-directory: desktop
+        run: npx electron-builder --${{ matrix.target }} --publish never --config.artifactName='CloudMusic-Local-${version}.${ext}'
 
       - uses: actions/upload-artifact@v4
         with:
