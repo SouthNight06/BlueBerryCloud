@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { api } from "../api/client";
+import { localApi } from "../api/local";
+import type { LocalBackup } from "../api/local";
+import { LOCAL_MODE } from "../api/mode";
 import type { BiliAccount, CacheStats } from "../api/types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
@@ -61,7 +64,8 @@ const CACHE_ROWS = [
 ] as const;
 
 export function SettingsView() {
-  const { user, settings, tracks, playlists, updatePreferences, attempt, logout } = useApp();
+  const { user, settings, tracks, playlists, updatePreferences, attempt, logout, refresh } =
+    useApp();
   const { push } = useToast();
   const { desktopLyrics, setDesktopLyrics } = useUi();
 
@@ -73,8 +77,11 @@ export function SettingsView() {
   const [cache, setCache] = useState<CacheStats | null>(null);
   const [clearing, setClearing] = useState<"" | "covers" | "orphans" | "all">("");
 
-  const [pending, setPending] = useState<"app" | "bili" | null>(null);
+  const [pending, setPending] = useState<"app" | "bili" | "import" | null>(null);
   const [busy, setBusy] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [importTarget, setImportTarget] = useState<LocalBackup | null>(null);
+  const backupInput = useRef<HTMLInputElement | null>(null);
 
   const preferences = settings?.preferences ?? {};
   const balance = Boolean(preferences.volumeBalance);
@@ -199,9 +206,66 @@ export function SettingsView() {
     }
   };
 
+  const exportBackup = async () => {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      const payload = await localApi.exportData();
+      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `xiaoyun-local-${payload.exportedAt.slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+      push(`已导出 ${payload.tracks.length} 首曲目、${payload.playlists.length} 个歌单`);
+    } catch (error) {
+      push(describeError(error), "error");
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const readBackup = async (file: File) => {
+    try {
+      const payload = JSON.parse(await file.text()) as LocalBackup;
+      if (!payload || payload.app !== "xiaoyun-local" || !Array.isArray(payload.tracks)) {
+        push("这不是本地版的备份文件", "error");
+        return;
+      }
+      setImportTarget(payload);
+      setPending("import");
+    } catch {
+      push("备份文件解析失败", "error");
+    }
+  };
+
+  const runImport = async () => {
+    if (!importTarget) return;
+    setBusy(true);
+    try {
+      const result = await localApi.importData(importTarget);
+      await refresh();
+      push(`已导入 ${result.tracks} 首曲目、${result.playlists} 个歌单`);
+    } catch (error) {
+      push(describeError(error), "error");
+    } finally {
+      setBusy(false);
+      setImportTarget(null);
+      if (backupInput.current) backupInput.current.value = "";
+    }
+  };
+
   const confirmPending = async () => {
     if (!pending || busy) return;
     const target = pending;
+    if (target === "import") {
+      setPending(null);
+      await runImport();
+      return;
+    }
     setBusy(true);
     if (target === "app") {
       setBusy(false);
@@ -231,11 +295,13 @@ export function SettingsView() {
         </div>
       </header>
 
-      <section className="view__section">
-        <div className="view__legend">
-          <span>小云畅听账号</span>
-          <span className="num">{tracks.length + playlists.length}</span>
-        </div>
+      {!LOCAL_MODE ? (
+        <>
+          <section className="view__section">
+            <div className="view__legend">
+              <span>小云畅听账号</span>
+              <span className="num">{tracks.length + playlists.length}</span>
+            </div>
         <div className="setgroup">
           <div className="setrow">
             <span className="setavatar" aria-hidden="true">
@@ -310,9 +376,11 @@ export function SettingsView() {
                 </a>
               )}
             </div>
-          </div>
-        </div>
-      </section>
+              </div>
+            </div>
+          </section>
+        </>
+      ) : null}
 
       <section className="view__section">
         <div className="view__legend">
@@ -551,6 +619,60 @@ export function SettingsView() {
         </div>
       </section>
 
+      {LOCAL_MODE ? (
+        <section className="view__section">
+          <div className="view__legend">
+            <span>本机数据</span>
+            <span>全部保存在这台设备</span>
+          </div>
+          <div className="setgroup">
+            <div className="setrow">
+              <div className="setrow__main">
+                <div className="setrow__title">备份与恢复</div>
+                <div className="setrow__desc">
+                  导出会把曲目音频、封面、歌单、主题与偏好打包成一个 JSON 文件；导入会覆盖这台设备上的现有数据。
+                </div>
+              </div>
+              <div className="setrow__act">
+                <button
+                  type="button"
+                  className="btn btn--quiet btn--sm"
+                  onClick={() => void exportBackup()}
+                  disabled={backupBusy}
+                >
+                  {backupBusy ? "导出中…" : "导出备份"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  onClick={() => backupInput.current?.click()}
+                  disabled={busy}
+                >
+                  导入备份
+                </button>
+              </div>
+            </div>
+            <div className="setrow setrow--foot">
+              <div className="setrow__main">
+                <div className="setrow__desc">
+                  曲库 {tracks.length} 首 · 歌单 {playlists.length} 个 · 数据只存在本机浏览器存储里，换设备请用备份文件搬迁。
+                </div>
+              </div>
+            </div>
+          </div>
+          <input
+            ref={backupInput}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void readBackup(file);
+            }}
+          />
+        </section>
+      ) : null}
+
       <section className="view__section">
         <div className="view__legend">
           <span>缓存</span>
@@ -611,14 +733,19 @@ export function SettingsView() {
       <section className="view__section">
         <div className="view__legend">
           <span>关于与致谢</span>
-          <span className="num">v{VERSION}</span>
+          <span className="num">
+            v{VERSION}
+            {LOCAL_MODE ? " · 本地版" : ""}
+          </span>
         </div>
         <div className="setgroup">
           <div className="setrow">
             <div className="setrow__main">
               <div className="setrow__title">小云畅听 · Cloud Music</div>
               <div className="setrow__desc">
-                蓝莓与云朵主题。代码与设计以开源方式维护，下面的项目提供了思路、规范或素材。
+                {LOCAL_MODE
+                  ? "本地版不连接服务器，曲库、歌单与设置只保存在这台设备上。"
+                  : "蓝莓与云朵主题。代码与设计以开源方式维护，下面的项目提供了思路、规范或素材。"}
               </div>
             </div>
             <div className="setrow__act">
@@ -655,13 +782,15 @@ export function SettingsView() {
 
       {pending ? (
         <ConfirmDialog
-          title={pending === "app" ? "退出登录" : "退出哔哩哔哩"}
+          title={pending === "app" ? "退出登录" : pending === "import" ? "导入备份" : "退出哔哩哔哩"}
           message={
             pending === "app"
               ? "退出后需要重新输入用户名与密码，曲库与歌单仍保存在服务器。"
-              : "退出后需要重新扫码才能继续浏览收藏夹，已下载的音频不受影响。"
+              : pending === "import"
+                ? `导入会清空并替换这台设备上的曲库与歌单，来自备份的 ${importTarget?.tracks.length ?? 0} 首曲目、${importTarget?.playlists.length ?? 0} 个歌单会被写入。`
+                : "退出后需要重新扫码才能继续浏览收藏夹，已下载的音频不受影响。"
           }
-          confirmLabel="退出"
+          confirmLabel={pending === "import" ? "覆盖导入" : "退出"}
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={() => void confirmPending()}

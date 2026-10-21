@@ -1,3 +1,6 @@
+import { ApiError } from "./errors";
+import { localApi } from "./local";
+import { LOCAL_MODE } from "./mode";
 import type {
   AuthResponse,
   BiliAccount,
@@ -152,6 +155,7 @@ export async function checkServer(value: string): Promise<boolean> {
 }
 
 export async function syncApiBase(): Promise<string> {
+  if (LOCAL_MODE) return apiBase;
   if (!isNativeApp() || readRaw(API_BASE_KEY) !== null) return apiBase;
   for (const url of CONFIG_URLS) {
     try {
@@ -173,17 +177,7 @@ export async function syncApiBase(): Promise<string> {
   return apiBase;
 }
 
-export class ApiError extends Error {
-  status: number;
-  code: string;
-
-  constructor(status: number, code: string) {
-    super(code);
-    this.name = "ApiError";
-    this.status = status;
-    this.code = code;
-  }
-}
+export { ApiError } from "./errors";
 
 export function readStoredToken(): string | null {
   try {
@@ -215,6 +209,7 @@ export function currentToken(): string | null {
 
 export function withToken(url: string): string {
   const absolute = resolveUrl(url);
+  if (LOCAL_MODE) return absolute;
   if (!inMemoryToken) return absolute;
   const separator = absolute.includes("?") ? "&" : "?";
   return `${absolute}${separator}token=${encodeURIComponent(inMemoryToken)}`;
@@ -274,7 +269,7 @@ function safeJson(raw: string): Record<string, unknown> | null {
   }
 }
 
-export const api = {
+const remoteApi = {
   register(username: string, password: string) {
     return request<AuthResponse>("/api/auth/register", { json: { username, password } });
   },
@@ -462,3 +457,9 @@ export const api = {
     });
   },
 };
+
+export type ClientApi = typeof remoteApi;
+
+const localClient: ClientApi = localApi;
+
+export const api: ClientApi = LOCAL_MODE ? localClient : remoteApi;

@@ -78,6 +78,17 @@ const ERROR_COPY: Record<string, string> = {
   ai_invalid_lyric: "AI 返回的内容不是有效的 LRC 歌词",
   target_invalid: "清理目标不正确",
   id_invalid: "参数不正确",
+  local_storage_unavailable: "这台设备的浏览器不支持本地存储，无法保存曲库",
+  local_storage_failed: "本机数据读写失败，请重试",
+  local_storage_quota: "本机存储空间不足，请清理后再导入",
+  local_backup_invalid: "备份文件格式不正确",
+  local_backup_failed: "备份文件生成失败",
+  local_import_unsupported: "本地版只支持从本机导入音频",
+  local_bili_unavailable: "本地版不包含哔哩哔哩功能",
+  local_lyrics_unavailable: "本地版没有 AI 歌词生成功能",
+  theme_builtin_readonly: "内置主题不能修改或删除",
+  playlist_name_required: "请先给歌单起个名字",
+  theme_name_required: "请先给主题起个名字",
 };
 
 export function describeError(error: unknown): string {

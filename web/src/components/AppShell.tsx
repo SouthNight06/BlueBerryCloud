@@ -1,3 +1,4 @@
+import { LOCAL_MODE } from "../api/mode";
 import { useRoute } from "../lib/route";
 import { BiliView } from "../screens/BiliView";
 import { DiscoverView } from "../screens/DiscoverView";
@@ -27,7 +28,8 @@ export function AppShell() {
         {route.name === "library" ? <LibraryView /> : null}
         {route.name === "playlists" ? <PlaylistsView /> : null}
         {route.name === "playlist" ? <PlaylistView id={route.id} /> : null}
-        {route.name === "bilibili" ? <BiliView /> : null}
+        {route.name === "bilibili" && !LOCAL_MODE ? <BiliView /> : null}
+        {route.name === "bilibili" && LOCAL_MODE ? <DiscoverView /> : null}
         {route.name === "themes" ? <ThemesView /> : null}
         {route.name === "settings" ? <SettingsView /> : null}
       </main>
