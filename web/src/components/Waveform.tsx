@@ -5,7 +5,11 @@ import { usePlayer } from "../state/PlayerStore";
 
 const MIN_BAR = 1.6;
 
-export function Waveform() {
+type WaveformProps = {
+  variant?: "rail" | "bar";
+};
+
+export function Waveform({ variant = "rail" }: WaveformProps) {
   const { playing } = usePlayer();
   const { settings } = useApp();
   const djMode = Boolean(settings?.preferences?.djMode);
@@ -30,11 +34,14 @@ export function Waveform() {
     let raf = 0;
     let frames = 0;
     let alpha = 0;
-    let painted = false;
+    let resting = false;
+
+    const barCount = (w: number) => (w < 260 ? 26 : w < 480 ? 34 : w < 760 ? 44 : WAVE_BANDS);
 
     const readAccent = () => {
       const value = getComputedStyle(canvas).getPropertyValue("--accent").trim();
       if (value) accent = value;
+      resting = false;
     };
 
     const resize = () => {
@@ -46,7 +53,6 @@ export function Waveform() {
       canvas.height = Math.max(1, Math.round(height * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       readAccent();
-      painted = false;
     };
 
     const barPath = (x: number, y: number, w: number, h: number, r: number) => {
@@ -66,6 +72,29 @@ export function Waveform() {
       ctx.closePath();
     };
 
+    const drawResting = () => {
+      const bars = barCount(width);
+      const cell = width / bars;
+      const gap = Math.min(4, Math.max(1.2, cell * 0.34));
+      const barW = Math.max(1, cell - gap);
+      const ceiling = height * 0.84;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = accent;
+      for (let i = 0; i < bars; i += 1) {
+        const t = (i + 0.5) / bars;
+        const hump = Math.sin(Math.PI * t);
+        const wobble = 0.74 + 0.26 * Math.sin(t * Math.PI * 3.4 + 0.7);
+        const level = Math.max(0.12, hump * wobble);
+        const h = Math.max(MIN_BAR, level * ceiling * 0.52);
+        ctx.globalAlpha = 0.18 + 0.2 * hump;
+        barPath(i * cell + gap / 2, height - h, barW, h, barW / 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 0.26;
+      ctx.fillRect(0, height - 1, width, 1);
+      ctx.globalAlpha = 1;
+    };
+
     const draw = () => {
       raf = window.requestAnimationFrame(draw);
       if (!width || !height) return;
@@ -76,16 +105,16 @@ export function Waveform() {
       const target = live ? (stateRef.current.djMode ? 0.62 : 0.4) : 0;
       alpha += (target - alpha) * 0.12;
 
-      if (!live && alpha < 0.01) {
-        if (painted) {
-          ctx.clearRect(0, 0, width, height);
-          painted = false;
+      if (!live && alpha < 0.02) {
+        if (!resting) {
+          drawResting();
+          resting = true;
         }
         return;
       }
+      resting = false;
 
-      painted = true;
-      const bars = width < 480 ? 34 : width < 760 ? 44 : WAVE_BANDS;
+      const bars = barCount(width);
       const cell = width / bars;
       const gap = Math.min(4, Math.max(1.2, cell * 0.34));
       const barW = Math.max(1, cell - gap);
@@ -142,5 +171,11 @@ export function Waveform() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="player__wave" aria-hidden="true" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className={variant === "rail" ? "wave wave--rail" : "wave wave--bar"}
+      aria-hidden="true"
+    />
+  );
 }

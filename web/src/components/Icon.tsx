@@ -188,9 +188,19 @@ const GLYPHS: Record<IconName, ReactNode> = {
   ),
   settings: (
     <>
-      <circle cx="12" cy="12" r="3.1" />
-      <path d="M12 3.4v2.1M12 18.5v2.1M20.6 12h-2.1M5.5 12H3.4" />
-      <path d="M18.1 5.9l-1.5 1.5M7.4 16.6l-1.5 1.5M18.1 18.1l-1.5-1.5M7.4 7.4 5.9 5.9" />
+      <circle cx="12" cy="12" r="6.5" />
+      <circle cx="12" cy="12" r="2.45" />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+        <rect
+          key={angle}
+          x="10.85"
+          y="2.1"
+          width="2.3"
+          height="4.3"
+          rx="1.05"
+          transform={`rotate(${angle} 12 12)`}
+        />
+      ))}
     </>
   ),
   lyrics: (

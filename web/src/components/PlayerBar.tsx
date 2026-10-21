@@ -4,7 +4,7 @@ import { usePlayer } from "../state/PlayerStore";
 import { useUi } from "../state/UiStore";
 import { Artwork } from "./Artwork";
 import { Icon } from "./Icon";
-import { Waveform } from "./Waveform";
+import { Mascot } from "./Mascot";
 
 export function PlayerBar() {
   const {
@@ -25,21 +25,30 @@ export function PlayerBar() {
     toggleShuffle,
     cycleRepeat,
   } = usePlayer();
-  const { desktopLyrics, lyricsPanel, toggleDesktopLyrics, openLyrics } = useUi();
+  const { desktopLyrics, lyricsPanel, toggleDesktopLyrics, openLyrics, navOpen, toggleNav } =
+    useUi();
 
   const percent = duration > 0 ? Math.min(100, (progress / duration) * 100) : 0;
   const level = muted ? 0 : volume;
 
   return (
     <div className="player">
-      <Waveform />
-
       <div className="player__line">
         <span style={{ width: `${percent}%` }} />
       </div>
 
       <div className="player__inner">
         <div className="player__now">
+          <button
+            type="button"
+            className="ibtn player__menu"
+            onClick={toggleNav}
+            aria-label="打开菜单"
+            aria-expanded={navOpen}
+            title="菜单"
+          >
+            <Icon name={navOpen ? "close" : "menu"} size={17} />
+          </button>
           {current ? (
             <>
               <Artwork seed={trackSeed(current)} size={44} cover={current.coverUrl} />
@@ -170,6 +179,7 @@ export function PlayerBar() {
               aria-label="音量"
             />
           </div>
+          <Mascot />
         </div>
       </div>
     </div>

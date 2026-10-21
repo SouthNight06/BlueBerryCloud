@@ -10,6 +10,9 @@ type UiValue = {
   lyricsPanel: boolean;
   openLyrics: () => void;
   closeLyrics: () => void;
+  navOpen: boolean;
+  toggleNav: () => void;
+  closeNav: () => void;
 };
 
 const UiContext = createContext<UiValue | null>(null);
@@ -33,6 +36,7 @@ function storeDesktop(value: boolean) {
 export function UiProvider({ children }: { children: ReactNode }) {
   const [desktopLyrics, setDesktopState] = useState(readDesktop);
   const [lyricsPanel, setLyricsPanel] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     storeDesktop(desktopLyrics);
@@ -43,6 +47,22 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const openLyrics = useCallback(() => setLyricsPanel(true), []);
   const closeLyrics = useCallback(() => setLyricsPanel(false), []);
 
+  const toggleNav = useCallback(() => setNavOpen((value) => !value), []);
+  const closeNav = useCallback(() => setNavOpen(false), []);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    window.addEventListener("hashchange", closeNav);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeNav();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("hashchange", closeNav);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [navOpen, closeNav]);
+
   const value = useMemo<UiValue>(
     () => ({
       desktopLyrics,
@@ -51,8 +71,21 @@ export function UiProvider({ children }: { children: ReactNode }) {
       lyricsPanel,
       openLyrics,
       closeLyrics,
+      navOpen,
+      toggleNav,
+      closeNav,
     }),
-    [desktopLyrics, setDesktopLyrics, toggleDesktopLyrics, lyricsPanel, openLyrics, closeLyrics],
+    [
+      desktopLyrics,
+      setDesktopLyrics,
+      toggleDesktopLyrics,
+      lyricsPanel,
+      openLyrics,
+      closeLyrics,
+      navOpen,
+      toggleNav,
+      closeNav,
+    ],
   );
 
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
