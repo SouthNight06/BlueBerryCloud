@@ -10,6 +10,7 @@ import {
   DOLL_GROUPS,
   DOLL_MODES,
   DOLL_MODE_LABEL,
+  dollArt,
   findDoll,
   normalizeDollMode,
 } from "../lib/dolls";
@@ -23,7 +24,7 @@ import {
 import { useToast } from "../state/ToastStore";
 import { useUi } from "../state/UiStore";
 
-const VERSION = "1.0.9";
+const VERSION = "1.0.10";
 
 const CREDITS = [
   {
@@ -83,6 +84,7 @@ export function SettingsView() {
   const autoTempo = preferences.djAutoTempo !== false;
   const doll = findDoll(preferences.mascot);
   const dollMode = normalizeDollMode(preferences.mascotMode);
+  const dollMasked = preferences.mascotMask === true;
   const [tempo, setTempo] = useState({ bpm: 0, factor: 1 });
 
   useEffect(() => {
@@ -475,6 +477,26 @@ export function SettingsView() {
           </div>
           <div className="setrow">
             <div className="setrow__main">
+              <div className="setrow__title">Ave Mujica 面具</div>
+              <div className="setrow__desc">
+                {dollMasked
+                  ? "祥子、睦、海铃、若麦、初华换成假面立绘。"
+                  : "五只按日常立绘出场；打开后换成舞台假面立绘。"}
+              </div>
+              <div className="setrow__chips">
+                <button
+                  type="button"
+                  className="chip"
+                  aria-pressed={dollMasked}
+                  onClick={() => void updatePreferences({ mascotMask: !dollMasked })}
+                >
+                  {dollMasked ? "面具：开" : "面具：关"}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="setrow">
+            <div className="setrow__main">
               <div className="setrow__title">选中的玩偶</div>
               <div className="setrow__desc">
                 只在「单个」模式下生效；「全员」与「主唱」按乐队自动安排。
@@ -489,7 +511,7 @@ export function SettingsView() {
                     title={`${item.name} · ${DOLL_GROUPS[item.group]}`}
                     onClick={() => void updatePreferences({ mascot: item.id })}
                   >
-                    <img src={item.art} alt="" draggable={false} />
+                    <img src={dollArt(item, dollMasked)} alt="" draggable={false} />
                     <span>{item.name}</span>
                   </button>
                 ))}

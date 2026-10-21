@@ -13,6 +13,7 @@ export type Doll = {
   group: DollGroup;
   vocal: boolean;
   art: string;
+  maskArt?: string;
 };
 
 const doll = (id: string, name: string, group: DollGroup, vocal = false): Doll => ({
@@ -21,7 +22,12 @@ const doll = (id: string, name: string, group: DollGroup, vocal = false): Doll =
   group,
   vocal,
   art: `/dolls/${id}.png`,
+  ...(group === "mujica" ? { maskArt: `/dolls/${id}-mask.png` } : {}),
 });
+
+export function dollArt(item: Doll, masked: boolean): string {
+  return masked && item.maskArt ? item.maskArt : item.art;
+}
 
 export const DOLLS: readonly Doll[] = [
   doll("ksm", "户山香澄", "popipa", true),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { useApp } from "../state/AppStore";
-import { DOLLS, DOLL_GROUPS, DOLL_MODES, DOLL_MODE_LABEL, findDoll, normalizeDollMode } from "../lib/dolls";
+import { DOLLS, DOLL_GROUPS, DOLL_MODES, DOLL_MODE_LABEL, dollArt, findDoll, normalizeDollMode } from "../lib/dolls";
 
 const BOUNCE = [
   { transform: "translateY(0) scale(1, 1)", offset: 0 },
@@ -23,6 +23,7 @@ export function Mascot() {
 
   const doll = findDoll(settings?.preferences?.mascot);
   const mode = normalizeDollMode(settings?.preferences?.mascotMode);
+  const masked = settings?.preferences?.mascotMask === true;
 
   const bounce = useCallback(() => {
     const art = artRef.current;
@@ -83,7 +84,7 @@ export function Mascot() {
         aria-expanded={picker ? "true" : "false"}
         title={`${doll.name} · 右键换一只`}
       >
-        <img ref={artRef} className="mascot__art" src={doll.art} alt="" draggable={false} />
+        <img ref={artRef} className="mascot__art" src={dollArt(doll, masked)} alt="" draggable={false} />
       </button>
 
       {picker ? (
@@ -110,6 +111,15 @@ export function Mascot() {
                 {DOLL_MODE_LABEL[item]}
               </button>
             ))}
+            <button
+              type="button"
+              className="chip chip--mask"
+              aria-pressed={masked}
+              title="Ave Mujica 五只切换面具立绘"
+              onClick={() => void updatePreferences({ mascotMask: !masked })}
+            >
+              面具 {masked ? "开" : "关"}
+            </button>
           </div>
           <div className="dollpick__grid">
             {DOLLS.map((item) => (
@@ -125,7 +135,7 @@ export function Mascot() {
                   bounce();
                 }}
               >
-                <img src={item.art} alt="" draggable={false} />
+                <img src={dollArt(item, masked)} alt="" draggable={false} />
                 <span>{item.name}</span>
               </button>
             ))}

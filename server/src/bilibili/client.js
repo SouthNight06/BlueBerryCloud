@@ -25,8 +25,12 @@ async function biliFetch(url, { cookie, timeout = 15_000, headers = {} } = {}) {
     headers: {
       "User-Agent": USER_AGENT,
       Referer: REFERER,
+      Origin: "https://www.bilibili.com",
       Accept: "application/json, text/plain, */*",
       "Accept-Language": "zh-CN,zh;q=0.9",
+      "Sec-Fetch-Dest": "empty",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Site": "same-site",
       ...(cookie ? { Cookie: cookie } : {}),
       ...headers,
     },
@@ -35,17 +39,27 @@ async function biliFetch(url, { cookie, timeout = 15_000, headers = {} } = {}) {
   });
 }
 
-async function biliJson(url, options) {
+async function biliJson(url, options = {}) {
+  const { fingerprint = true, retryRisk = true, ...rest } = options;
+  const extra = fingerprint ? await anonymous(false) : "";
+  const cookie = mergeCookie(rest.cookie, extra);
   let response;
   try {
-    response = await biliFetch(url, options);
+    response = await biliFetch(url, { ...rest, cookie });
   } catch (error) {
     if (error?.name === "TimeoutError") {
       throw new BiliError("bili_timeout", "连接哔哩哔哩超时，请稍后再试");
     }
     throw new BiliError("bili_unreachable", "无法连接哔哩哔哩，请检查网络");
   }
+  if (response.status === 412 && fingerprint && retryRisk) {
+    await anonymous(true);
+    return biliJson(url, { ...rest, fingerprint, retryRisk: false });
+  }
   if (!response.ok) {
+    if (response.status === 412) {
+      throw new BiliError("bili_http_412", "哔哩哔哩风控拦截了这次请求，请稍后再试");
+    }
     throw new BiliError("bili_http_error", `哔哩哔哩接口返回 ${response.status}`);
   }
   let payload = null;
@@ -102,18 +116,32 @@ async function signedQuery(params) {
   return `${query}&w_rid=${rid}`;
 }
 
-let anonymousCookie = "";
+const FINGERPRINT_TTL = 6 * 3_600_000;
+let fingerprint = { at: 0, cookie: "" };
 
-async function anonymous() {
-  if (anonymousCookie) return anonymousCookie;
-  try {
-    const data = await biliJson("https://api.bilibili.com/x/frontend/finger/spi");
-    const buvid3 = data?.b_3 ?? "";
-    if (buvid3) anonymousCookie = `buvid3=${buvid3}`;
-  } catch {
-    /* 搜索仍可尝试无 cookie 请求 */
+async function anonymous(force = false) {
+  if (!force && fingerprint.cookie && Date.now() - fingerprint.at < FINGERPRINT_TTL) {
+    return fingerprint.cookie;
   }
-  return anonymousCookie;
+  try {
+    const data = await biliJson("https://api.bilibili.com/x/frontend/finger/spi", {
+      fingerprint: false,
+    });
+    const parts = [];
+    if (data?.b_3) parts.push(`buvid3=${data.b_3}`);
+    if (data?.b_4) parts.push(`buvid4=${data.b_4}`);
+    parts.push(`b_nut=${Math.floor(Date.now() / 1000)}`);
+    fingerprint = { at: Date.now(), cookie: parts.join("; ") };
+  } catch {
+    fingerprint = { at: Date.now(), cookie: fingerprint.cookie };
+  }
+  return fingerprint.cookie;
+}
+
+function mergeCookie(cookie, extra) {
+  if (!extra) return cookie ?? "";
+  if (!cookie) return extra;
+  return /(?:^|;\s*)buvid3=/.test(cookie) ? cookie : `${cookie}; ${extra}`;
 }
 
 export function normalizeImage(url) {
@@ -332,7 +360,7 @@ export async function searchVideos(keyword, limit = 20, cookie) {
   });
   const data = await biliJson(
     `https://api.bilibili.com/x/web-interface/wbi/search/type?${query}`,
-    { cookie: cookie || (await anonymous()) },
+    { cookie },
   );
   const list = Array.isArray(data?.result) ? data.result : [];
   return list

@@ -825,29 +825,34 @@
 }
 
 :root {
-  --parade-h: clamp(42px, 5.2vw + 18px, 88px);
+  --parade-h: clamp(
+    34px,
+    min(5.2vw + 18px, calc(112px - max(0, var(--parade-count, 2) - 2) * 3px)),
+    88px
+  );
+  --parade-left: var(--rail);
 }
 
 .parade {
   position: absolute;
-  left: 0;
+  left: var(--parade-left, 0);
   right: 0;
   bottom: 100%;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  gap: 2px;
   height: var(--parade-h);
-  padding: 0 10px;
+  padding: 0 12px;
   pointer-events: none;
 }
 
 .parade__slot {
+  position: relative;
   flex: 1 1 0;
-  max-width: calc(var(--parade-h) * 0.9);
+  max-width: calc(var(--parade-h) * 0.78);
   min-width: 0;
   height: 100%;
-  display: grid;
-  place-items: end center;
   padding: 0;
   border: 0;
   background: transparent;
@@ -858,9 +863,12 @@
 }
 
 .parade__art {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  object-position: bottom center;
   transform-origin: 50% 100%;
   filter: drop-shadow(0 3px 6px rgba(18, 24, 52, 0.2));
   transition: translate 140ms var(--ease), filter 0.2s var(--ease);
@@ -2334,15 +2342,37 @@
       var(--player-h) + var(--safe-bottom) + var(--parade-h) + 14px
     );
   }
+
+  .parade {
+    --parade-left: 0;
+  }
 }
 
 @media (max-width: 620px) {
+  :root {
+    --parade-h: clamp(44px, 11vw + 6px, 62px);
+  }
+
   .view {
     padding: 22px 16px 32px;
   }
 
-  .parade__art {
-    width: 158%;
+  .parade {
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 0 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .parade::-webkit-scrollbar {
+    display: none;
+  }
+
+  .parade__slot {
+    flex: 0 0 auto;
+    width: calc(var(--parade-h) * 0.82);
+    max-width: none;
   }
 
   .view__head {

@@ -4,9 +4,16 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const READY_PATTERN = /XIAOYUN_READY\s+(\d+)/;
+const REMOTE_BASE = (process.env.XIAOYUN_REMOTE_BASE || "https://music.lichenlc.cn").replace(
+  /\/+$/,
+  "",
+);
+const FORCE_LOCAL = process.env.XIAOYUN_DESKTOP_LOCAL === "1";
 let serverPort = 0;
 let serverProcess = null;
 let mainWindow = null;
+let appUrl = "";
+let appOrigin = "";
 let quitting = false;
 
 function serverDir() {
@@ -108,7 +115,7 @@ function startServer() {
   });
 }
 
-function createWindow(port) {
+function createWindow(url, origin) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 880,
@@ -131,10 +138,10 @@ function createWindow(port) {
     return { action: "deny" };
   });
 
-  mainWindow.webContents.on("will-navigate", (event, url) => {
-    if (url.startsWith(`http://127.0.0.1:${port}/`)) return;
+  mainWindow.webContents.on("will-navigate", (event, next) => {
+    if (next.startsWith(origin)) return;
     event.preventDefault();
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    if (/^https?:\/\//i.test(next)) shell.openExternal(next);
   });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
@@ -142,7 +149,21 @@ function createWindow(port) {
     mainWindow = null;
   });
 
-  return mainWindow.loadURL(`http://127.0.0.1:${port}/`);
+  return mainWindow.loadURL(url);
+}
+
+async function remoteReady() {
+  if (FORCE_LOCAL) return false;
+  try {
+    const response = await fetch(`${REMOTE_BASE}/api/health`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return Boolean(data && data.ok);
+  } catch {
+    return false;
+  }
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -157,8 +178,15 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
     try {
-      serverPort = await startServer();
-      await createWindow(serverPort);
+      if (await remoteReady()) {
+        appUrl = `${REMOTE_BASE}/`;
+        appOrigin = appUrl;
+      } else {
+        serverPort = await startServer();
+        appUrl = `http://127.0.0.1:${serverPort}/`;
+        appOrigin = appUrl;
+      }
+      await createWindow(appUrl, appOrigin);
     } catch (error) {
       dialog.showErrorBox(
         "小云畅听 启动失败",
@@ -168,8 +196,8 @@ if (!app.requestSingleInstanceLock()) {
     }
 
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0 && serverPort) {
-        createWindow(serverPort);
+      if (BrowserWindow.getAllWindows().length === 0 && appUrl) {
+        createWindow(appUrl, appOrigin);
       }
     });
   });

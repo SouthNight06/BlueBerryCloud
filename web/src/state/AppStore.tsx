@@ -99,6 +99,26 @@ export function AppProvider({
   }, [refresh, push]);
 
   useEffect(() => {
+    let last = 0;
+    const pull = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - last < 15_000) return;
+      last = now;
+      refresh().catch(() => undefined);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull();
+    };
+    window.addEventListener("focus", pull);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", pull);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refresh]);
+
+  useEffect(() => {
     if (themes.length === 0) return;
     const active = themes.find((theme) => theme.id === activeThemeId) ?? themes[0];
     applyTokens(active.tokens);
