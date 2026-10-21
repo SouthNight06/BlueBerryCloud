@@ -12,13 +12,13 @@
 
 界面走安静克制的路线：圆角、留白、细腻的层次与柔和的高光，中文字形使用猫啃珠圆体，英文字形回退到 Comic Sans，所有歌词与标题统一由 `--font-cute` 变量驱动。
 
-> 小云说：这条分支是本地版——没有服务器、没有登录，打开就能听歌，歌单和主题都躺在自己的机器里。想搬家就把设置里的备份文件带走。
+> 小云说：同一份代码出两个版本——**在线版**把歌单放在自己的服务器上，多台设备登录同一个账号就能同步；**离线版**没有服务器也没有登录，歌单和主题都躺在自己的机器里，想搬家就把设置里的备份文件带走。
 
 ---
 
 ## 目录
 
-- [本地版](#本地版)
+- [在线版与离线版](#在线版与离线版)
 - [功能特性](#功能特性)
 - [平台支持](#平台支持)
 - [技术栈](#技术栈)
@@ -34,16 +34,27 @@
 
 ---
 
-## 本地版
+## 在线版与离线版
 
-`local` 分支是完全本机运行的变体：没有服务端、没有账号，也没有登录页。
+同一套代码、同一个仓库，编译时用 `VITE_LOCAL_MODE` 决定数据存在哪。每次发版会同时产出两套安装包：文件名带 `Local` 的是离线版。
 
-- 打开即可用，曲库、歌单、主题、播放偏好全部存在本机（桌面端与安卓都是浏览器的 IndexedDB）。
-- 哔哩哔哩相关入口在本版本里隐藏，不联网取任何数据；导入音乐请用「音乐库 → 导入」。
-- 换设备搬数据：设置 → 本机数据 → 导出备份 / 导入备份，产物是一个 JSON（音频以 base64 内嵌，文件会偏大）。
-- 桌面端不启动本地服务，Electron 通过自定义协议 `xiaoyun://app/` 直接加载打包好的前端；origin 固定，IndexedDB 不会因为端口变化丢数据。
-- 构建本地版前端：`VITE_LOCAL_MODE=1 npm run build`（`web/` 目录）。
-- 打 `local-v*` 标签会触发 `.github/workflows/build-local.yml`，产出 Windows / macOS / Linux 安装包与 `CloudMusic-Local-*.apk`，并以预发布 Release 发布，避免抢占正式版 Latest。
+| | 在线版（`CloudMusic-1.2.0.*`） | 离线版（`CloudMusic-Local-1.2.0.*`） |
+| --- | --- | --- |
+| 数据存在哪 | 你部署的服务器（`server/`，SQLite） | 本机 IndexedDB（桌面端与安卓都是浏览器存储） |
+| 账号 | 需要注册 / 登录，多设备同账号同步 | 没有账号，也没有登录页，打开即用 |
+| 跨设备同步 | 歌单、主题、歌词、偏好跟着账号走 | 不自动同步，靠「设置 → 本机数据 → 导出 / 导入备份」搬走一个 JSON |
+| 曲库来源 | 本机导入 + 公开来源检索 + 哔哩哔哩 | 只支持本机导入，搜索在内网库内过滤 |
+| 哔哩哔哩 | 完整入口（扫码登录、收藏夹、播放） | 入口隐藏，不联网取任何数据 |
+| 桌面端运行方式 | 优先连远程服务器；连不上就用自带的服务端，数据落在本机 `userData/library` | 不启动服务端，Electron 用自定义协议 `xiaoyun://app/` 直接加载前端，origin 固定 |
+| 需要的网络 | 在线版服务器要能被访问到 | 全程可离线使用 |
+| 适合谁 | 有自己的机器 / 域名，想让手机和电脑共用一份歌单 | 只想在自己的电脑或手机上听自己的歌，不想维护服务器 |
+
+两边的界面完全一致，主题、玩偶、DJ 模式、律动侧栏、歌词都相同；差别只在数据归属与是否需要联网。
+
+- 构建在线版：`cd web && npm run build`
+- 构建离线版：`cd web` 后设 `VITE_LOCAL_MODE=1` 再 `npm run build`（PowerShell：`$env:VITE_LOCAL_MODE="1"; npm run build`）
+- 桌面端两种形态共用 `desktop/`：`server-dist` 里有服务端打包产物就走在线形态，没有就走离线形态
+- 打 `v*` 标签会触发 `.github/workflows/build.yml`，一次产出两套四平台产物（在线 4 个 + 离线 4 个）；`local-v*` 标签仍可用 `.github/workflows/build-local.yml` 单独发离线预发布版
 
 ---
 
@@ -253,6 +264,12 @@ server {
 
 未配置 `XIAOYUN_AI_BASE_URL` 时，AI 生成入口会返回 `ai_not_configured`，其余功能不受影响。
 
+前端在构建期读取一个变量：
+
+| 变量 | 默认值 | 作用 |
+| --- | --- | --- |
+| `VITE_LOCAL_MODE` | 空 | 设为 `1` 时构建离线版：不请求任何服务端接口，数据写入 IndexedDB，隐藏账号与哔哩哔哩入口 |
+
 ---
 
 ## 构建与发布
@@ -266,7 +283,9 @@ cd desktop && npm run dist:mac
 cd web && npm run android:apk  # Android Release APK
 ```
 
-`.github/workflows/build.yml` 会在推送 `v*` 标签时并行构建 Windows、macOS、Linux 与 Android 产物，并自动创建 GitHub Release。Android 签名可通过 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 四个 Secret 注入；未配置时使用临时调试签名。
+`.github/workflows/build.yml` 会在推送 `v*` 标签时并行构建**在线版与离线版**的 Windows、macOS、Linux 与 Android 产物（共 8 个文件），并自动创建 GitHub Release。Android 签名可通过 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 四个 Secret 注入；未配置时使用临时调试签名。
+
+服务端部署走独立的 `.github/workflows/deploy-server.yml`，推送 `deploy` 分支触发。
 
 ---
 

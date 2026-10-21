@@ -60,7 +60,7 @@ function serveWeb(app) {
   return root;
 }
 
-function createWindow({ title, onClosed }) {
+function createWindow({ title, origin = APP_ORIGIN, onClosed }) {
   const win = new BrowserWindow({
     width: 1280,
     height: 880,
@@ -84,7 +84,7 @@ function createWindow({ title, onClosed }) {
   });
 
   win.webContents.on("will-navigate", (event, next) => {
-    if (next.startsWith(APP_ORIGIN)) return;
+    if (next.startsWith(origin)) return;
     event.preventDefault();
     if (/^https?:\/\//i.test(next)) shell.openExternal(next);
   });

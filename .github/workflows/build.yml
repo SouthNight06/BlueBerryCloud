@@ -15,21 +15,30 @@ env:
 
 jobs:
   desktop:
-    name: desktop (${{ matrix.os }})
+    name: desktop-${{ matrix.flavor }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - flavor: online
+            os: ubuntu-latest
             target: linux
-            artifact: CloudMusic-*.AppImage
-          - os: windows-latest
+          - flavor: online
+            os: windows-latest
             target: win
-            artifact: CloudMusic-*.exe
-          - os: macos-latest
+          - flavor: online
+            os: macos-latest
             target: mac
-            artifact: CloudMusic-*.dmg
+          - flavor: local
+            os: ubuntu-latest
+            target: linux
+          - flavor: local
+            os: windows-latest
+            target: win
+          - flavor: local
+            os: macos-latest
+            target: mac
     steps:
       - uses: actions/checkout@v4
 
@@ -40,39 +49,54 @@ jobs:
           cache-dependency-path: |
             web/package-lock.json
             desktop/package-lock.json
-            server/package-lock.json
 
-      - name: Build web
+      - name: Build web (${{ matrix.flavor }})
+        working-directory: web
+        env:
+          VITE_LOCAL_MODE: ${{ matrix.flavor == 'local' && '1' || '0' }}
         run: |
           npm ci
           npm run build
-        working-directory: web
 
       - name: Install desktop deps
-        run: npm ci
         working-directory: desktop
-
-      - name: Install server deps
         run: npm ci
-        working-directory: server
 
-      - name: Bundle server
+      - name: Bundle server (online)
+        if: matrix.flavor == 'online'
+        working-directory: desktop
         run: npm run build:server
+
+      - name: Skip server bundle (local)
+        if: matrix.flavor == 'local'
         working-directory: desktop
+        run: |
+          mkdir -p server-dist
+          touch server-dist/.keep
 
       - name: Package ${{ matrix.target }}
-        run: npx electron-builder --${{ matrix.target }} --publish never
         working-directory: desktop
+        run: |
+          if [ "${{ matrix.flavor }}" = "local" ]; then
+            npx electron-builder --${{ matrix.target }} --publish never \
+              --config.artifactName='CloudMusic-Local-${version}.${ext}'
+          else
+            npx electron-builder --${{ matrix.target }} --publish never
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.target }}
-          path: desktop/release/${{ matrix.artifact }}
+          name: desktop-${{ matrix.flavor }}-${{ matrix.target }}
+          path: desktop/release/*
           if-no-files-found: error
 
   android:
-    name: android
+    name: android-${{ matrix.flavor }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [online, local]
     steps:
       - uses: actions/checkout@v4
 
@@ -94,15 +118,17 @@ jobs:
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
 
-      - name: Build web
+      - name: Build web (${{ matrix.flavor }})
+        working-directory: web
+        env:
+          VITE_LOCAL_MODE: ${{ matrix.flavor == 'local' && '1' || '0' }}
         run: |
           npm ci
           npm run build
-        working-directory: web
 
       - name: Capacitor sync
-        run: npx cap sync android
         working-directory: web
+        run: npx cap sync android
 
       - name: Prepare signing key
         working-directory: web/android
@@ -123,20 +149,25 @@ jobs:
           echo "XIAOYUN_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD || 'xiaoyun123456' }}" >> "$GITHUB_ENV"
 
       - name: Assemble release
-        run: ./gradlew assembleRelease --no-daemon
         working-directory: web/android
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Collect APK
+        working-directory: web/android
         run: |
           mkdir -p ../../out
-          cp app/build/outputs/apk/release/app-release*.apk \
-             "../../out/CloudMusic-${GITHUB_REF_NAME#v}.apk" 2>/dev/null \
-            || cp app/build/outputs/apk/release/app-release*.apk "../../out/CloudMusic.apk"
-        working-directory: web/android
+          version="${GITHUB_REF_NAME#v}"
+          if [ "${{ matrix.flavor }}" = "local" ]; then
+            target="CloudMusic-Local-${version}.apk"
+          else
+            target="CloudMusic-${version}.apk"
+          fi
+          cp app/build/outputs/apk/release/app-release*.apk "../../out/${target}" 2>/dev/null \
+            || cp app/build/outputs/apk/release/app-release*.apk "../../out/CloudMusic-${version}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: android
+          name: android-${{ matrix.flavor }}
           path: out/*.apk
           if-no-files-found: error
 
