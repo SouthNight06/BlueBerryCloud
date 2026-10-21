@@ -416,7 +416,7 @@ jobs:
           tar -czf web-dist.tgz -C web/dist .
           ls -lh web-dist.tgz
           mkdir -p srcpack/BlueBerryCloud-main
-          git archive HEAD server package.json | tar -x -C srcpack/BlueBerryCloud-main
+          git archive HEAD server | tar -x -C srcpack/BlueBerryCloud-main
           tar -czf src.tar.gz -C srcpack BlueBerryCloud-main
           ls -lh src.tar.gz
           scp -q remote-setup.sh target:/tmp/cloudmusic-setup.sh
