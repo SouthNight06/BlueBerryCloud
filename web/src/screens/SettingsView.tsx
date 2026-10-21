@@ -5,6 +5,14 @@ import type { BiliAccount, CacheStats } from "../api/types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
 import { describeError, formatBytes, formatDate } from "../lib/format";
+import {
+  DOLLS,
+  DOLL_GROUPS,
+  DOLL_MODES,
+  DOLL_MODE_LABEL,
+  findDoll,
+  normalizeDollMode,
+} from "../lib/dolls";
 import { waveBus } from "../lib/spectrum";
 import { useApp } from "../state/AppStore";
 import {
@@ -15,7 +23,7 @@ import {
 import { useToast } from "../state/ToastStore";
 import { useUi } from "../state/UiStore";
 
-const VERSION = "1.0.8";
+const VERSION = "1.0.9";
 
 const CREDITS = [
   {
@@ -73,6 +81,8 @@ export function SettingsView() {
   const djStrength = normalizeDjStrength(preferences.djStrength);
   const [strengthDraft, setStrengthDraft] = useState(djStrength);
   const autoTempo = preferences.djAutoTempo !== false;
+  const doll = findDoll(preferences.mascot);
+  const dollMode = normalizeDollMode(preferences.mascotMode);
   const [tempo, setTempo] = useState({ bpm: 0, factor: 1 });
 
   useEffect(() => {
@@ -417,6 +427,73 @@ export function SettingsView() {
               >
                 <span className="switch__knob" />
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="view__section">
+        <div className="view__legend">
+          <span>玩偶</span>
+          <span>
+            {doll.name} · {DOLL_MODE_LABEL[dollMode]}
+          </span>
+        </div>
+        <div className="setgroup">
+          <div className="setrow">
+            <div className="setrow__main">
+              <div className="setrow__title">底栏玩偶</div>
+              <div className="setrow__desc">
+                点一下就 Q 弹；右键可以在二十只里换人。开 DJ 模式后她会跟着节拍一直弹。
+              </div>
+            </div>
+          </div>
+          <div className="setrow">
+            <div className="setrow__main">
+              <div className="setrow__title">出场方式</div>
+              <div className="setrow__desc">
+                {dollMode === "single"
+                  ? "只让选中的那一只站在底栏最右边。"
+                  : dollMode === "vocal"
+                    ? "四支乐队的主唱排成一排，站在底栏上方。"
+                    : "全员出动，二十只挤成一排，站在底栏上方。"}
+              </div>
+              <div className="setrow__chips">
+                {DOLL_MODES.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className="chip"
+                    aria-pressed={dollMode === item}
+                    onClick={() => void updatePreferences({ mascotMode: item })}
+                  >
+                    {DOLL_MODE_LABEL[item]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="setrow">
+            <div className="setrow__main">
+              <div className="setrow__title">选中的玩偶</div>
+              <div className="setrow__desc">
+                只在「单个」模式下生效；「全员」与「主唱」按乐队自动安排。
+              </div>
+              <div className="setrow__dolls">
+                {DOLLS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="dollchip"
+                    aria-pressed={item.id === doll.id}
+                    title={`${item.name} · ${DOLL_GROUPS[item.group]}`}
+                    onClick={() => void updatePreferences({ mascot: item.id })}
+                  >
+                    <img src={item.art} alt="" draggable={false} />
+                    <span>{item.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

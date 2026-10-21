@@ -1,6 +1,7 @@
-import { useCallback, useRef } from "react";
-
-const MASCOT_SRC = "/ksm.png";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
+import { useApp } from "../state/AppStore";
+import { DOLLS, DOLL_GROUPS, DOLL_MODES, DOLL_MODE_LABEL, findDoll, normalizeDollMode } from "../lib/dolls";
 
 const BOUNCE = [
   { transform: "translateY(0) scale(1, 1)", offset: 0 },
@@ -11,8 +12,17 @@ const BOUNCE = [
   { transform: "translateY(0) scale(1, 1)", offset: 1 },
 ];
 
+const PICKER_WIDTH = 276;
+
 export function Mascot() {
+  const { settings, updatePreferences } = useApp();
   const artRef = useRef<HTMLImageElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const [picker, setPicker] = useState<{ left: number; bottom: number } | null>(null);
+
+  const doll = findDoll(settings?.preferences?.mascot);
+  const mode = normalizeDollMode(settings?.preferences?.mascotMode);
 
   const bounce = useCallback(() => {
     const art = artRef.current;
@@ -28,15 +38,100 @@ export function Mascot() {
     art.animate(BOUNCE, { duration: 680, easing: "cubic-bezier(0.34, 1.42, 0.62, 1)" });
   }, []);
 
+  const openPicker = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      const rect = wrapRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(PICKER_WIDTH, window.innerWidth - 16);
+      setPicker({
+        left: Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8),
+        bottom: window.innerHeight - rect.top + 10,
+      });
+      bounce();
+    },
+    [bounce],
+  );
+
+  useEffect(() => {
+    if (!picker) return;
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && pickerRef.current?.contains(target)) return;
+      setPicker(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPicker(null);
+    };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [picker]);
+
   return (
-    <button
-      type="button"
-      className="mascot"
-      onClick={bounce}
-      aria-label="戳一下小玩偶"
-      title="戳我"
-    >
-      <img ref={artRef} className="mascot__art" src={MASCOT_SRC} alt="" draggable={false} />
-    </button>
+    <div className="mascot__wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className="mascot"
+        onClick={bounce}
+        onContextMenu={openPicker}
+        aria-label={`戳一下${doll.name}`}
+        aria-haspopup="menu"
+        aria-expanded={picker ? "true" : "false"}
+        title={`${doll.name} · 右键换一只`}
+      >
+        <img ref={artRef} className="mascot__art" src={doll.art} alt="" draggable={false} />
+      </button>
+
+      {picker ? (
+        <div
+          className="dollpick"
+          ref={pickerRef}
+          role="menu"
+          aria-label="选择玩偶"
+          style={{ left: picker.left, bottom: picker.bottom } as CSSProperties}
+        >
+          <div className="dollpick__head">
+            <span>换一只</span>
+            <span className="num">{doll.name}</span>
+          </div>
+          <div className="dollpick__modes">
+            {DOLL_MODES.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className="chip"
+                aria-pressed={mode === item}
+                onClick={() => void updatePreferences({ mascotMode: item })}
+              >
+                {DOLL_MODE_LABEL[item]}
+              </button>
+            ))}
+          </div>
+          <div className="dollpick__grid">
+            {DOLLS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="dollpick__item"
+                aria-pressed={item.id === doll.id}
+                title={`${item.name} · ${DOLL_GROUPS[item.group]}`}
+                onClick={() => {
+                  void updatePreferences({ mascot: item.id, mascotMode: "single" });
+                  setPicker(null);
+                  bounce();
+                }}
+              >
+                <img src={item.art} alt="" draggable={false} />
+                <span>{item.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

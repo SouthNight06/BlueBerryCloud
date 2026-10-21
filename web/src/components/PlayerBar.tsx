@@ -1,8 +1,12 @@
+import { useEffect } from "react";
 import type { CSSProperties } from "react";
 import { formatTime, trackSeed } from "../lib/format";
+import { normalizeDollMode } from "../lib/dolls";
+import { useApp } from "../state/AppStore";
 import { usePlayer } from "../state/PlayerStore";
 import { useUi } from "../state/UiStore";
 import { Artwork } from "./Artwork";
+import { DollParade } from "./DollParade";
 import { Icon } from "./Icon";
 import { Mascot } from "./Mascot";
 
@@ -27,12 +31,24 @@ export function PlayerBar() {
   } = usePlayer();
   const { desktopLyrics, lyricsPanel, toggleDesktopLyrics, openLyrics, navOpen, toggleNav } =
     useUi();
+  const { settings } = useApp();
+  const dollMode = normalizeDollMode(settings?.preferences?.mascotMode);
 
   const percent = duration > 0 ? Math.min(100, (progress / duration) * 100) : 0;
   const level = muted ? 0 : volume;
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.parade = dollMode === "single" ? "off" : "on";
+    return () => {
+      root.dataset.parade = "off";
+    };
+  }, [dollMode]);
+
   return (
     <div className="player">
+      <DollParade />
+
       <div className="player__line">
         <span style={{ width: `${percent}%` }} />
       </div>
@@ -179,7 +195,7 @@ export function PlayerBar() {
               aria-label="音量"
             />
           </div>
-          <Mascot />
+          {dollMode === "single" ? <Mascot /> : null}
         </div>
       </div>
     </div>
